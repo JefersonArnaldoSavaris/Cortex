@@ -30,13 +30,17 @@ dependencies = [
     "tqdm>=4.67.1",
     "typing-extensions>=4.14.0",
     "yfinance>=0.2.63",
+    "fastapi>=0.115.0,<0.116.0",
+    "uvicorn[standard]>=0.30.0",
+    "sqlalchemy>=2.0.36",
+    "psycopg[binary]>=3.2.3",
 ]
 
 [project.scripts]
 tradingagents = "cli.main:app"
 
 [tool.setuptools.packages.find]
-include = ["tradingagents*", "cli*"]
+include = ["tradingagents*", "cli*", "apps*"]
 
 [tool.setuptools.package-data]
 cli = ["static/*"]

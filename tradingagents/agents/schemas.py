@@ -24,6 +24,21 @@ from typing import Optional
 from pydantic import BaseModel, Field
 
 
+PORTFOLIO_RATING_LABELS_PT = {
+    "Buy": "Comprar",
+    "Overweight": "Sobreponderar",
+    "Hold": "Manter",
+    "Underweight": "Reduzir exposição",
+    "Sell": "Vender",
+}
+
+TRADER_ACTION_LABELS_PT = {
+    "Buy": "Comprar",
+    "Hold": "Manter",
+    "Sell": "Vender",
+}
+
+
 # ---------------------------------------------------------------------------
 # Shared rating types
 # ---------------------------------------------------------------------------
@@ -93,11 +108,11 @@ class ResearchPlan(BaseModel):
 def render_research_plan(plan: ResearchPlan) -> str:
     """Render a ResearchPlan to markdown for storage and the trader's prompt context."""
     return "\n".join([
-        f"**Recommendation**: {plan.recommendation.value}",
+        f"**Recomendação**: {PORTFOLIO_RATING_LABELS_PT.get(plan.recommendation.value, plan.recommendation.value)}",
         "",
-        f"**Rationale**: {plan.rationale}",
+        f"**Justificativa**: {plan.rationale}",
         "",
-        f"**Strategic Actions**: {plan.strategic_actions}",
+        f"**Ações Estratégicas**: {plan.strategic_actions}",
     ])
 
 
@@ -146,19 +161,19 @@ def render_trader_proposal(proposal: TraderProposal) -> str:
     and any external code that greps for it.
     """
     parts = [
-        f"**Action**: {proposal.action.value}",
+        f"**Ação**: {TRADER_ACTION_LABELS_PT.get(proposal.action.value, proposal.action.value)}",
         "",
-        f"**Reasoning**: {proposal.reasoning}",
+        f"**Justificativa**: {proposal.reasoning}",
     ]
     if proposal.entry_price is not None:
-        parts.extend(["", f"**Entry Price**: {proposal.entry_price}"])
+        parts.extend(["", f"**Preço de Entrada**: {proposal.entry_price}"])
     if proposal.stop_loss is not None:
         parts.extend(["", f"**Stop Loss**: {proposal.stop_loss}"])
     if proposal.position_sizing:
-        parts.extend(["", f"**Position Sizing**: {proposal.position_sizing}"])
+        parts.extend(["", f"**Tamanho da Posição**: {proposal.position_sizing}"])
     parts.extend([
         "",
-        f"FINAL TRANSACTION PROPOSAL: **{proposal.action.value.upper()}**",
+        f"PROPOSTA FINAL DE TRANSAÇÃO: **{TRADER_ACTION_LABELS_PT.get(proposal.action.value, proposal.action.value).upper()}**",
     ])
     return "\n".join(parts)
 
@@ -215,14 +230,14 @@ def render_pm_decision(decision: PortfolioDecision) -> str:
     parsers and the report writers already handle.
     """
     parts = [
-        f"**Rating**: {decision.rating.value}",
+        f"**Classificação**: {PORTFOLIO_RATING_LABELS_PT.get(decision.rating.value, decision.rating.value)}",
         "",
-        f"**Executive Summary**: {decision.executive_summary}",
+        f"**Resumo Executivo**: {decision.executive_summary}",
         "",
-        f"**Investment Thesis**: {decision.investment_thesis}",
+        f"**Tese de Investimento**: {decision.investment_thesis}",
     ]
     if decision.price_target is not None:
-        parts.extend(["", f"**Price Target**: {decision.price_target}"])
+        parts.extend(["", f"**Preço-Alvo**: {decision.price_target}"])
     if decision.time_horizon:
-        parts.extend(["", f"**Time Horizon**: {decision.time_horizon}"])
+        parts.extend(["", f"**Horizonte de Tempo**: {decision.time_horizon}"])
     return "\n".join(parts)
