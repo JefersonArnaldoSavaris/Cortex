@@ -60,6 +60,8 @@ cover/
 local_settings.py
 db.sqlite3
 db.sqlite3-journal
+tradingagents_app.db
+tradingagents_app.db-journal
 
 # Flask stuff:
 instance/
@@ -217,3 +219,17 @@ __marimo__/
 
 # Cache
 **/data_cache/
+
+# Local toolchains/downloads
+.tools/
+downloads/
+
+# Web app
+apps/web/.next/
+apps/web/node_modules/
+apps/web/out/
+apps/web/.env.local
+*.tsbuildinfo
+
+# Generated reports
+reports/

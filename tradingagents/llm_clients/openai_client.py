@@ -105,7 +105,7 @@ class DeepSeekChatOpenAI(NormalizedChatOpenAI):
 
 # Kwargs forwarded from user config to ChatOpenAI
 _PASSTHROUGH_KWARGS = (
-    "timeout", "max_retries", "reasoning_effort",
+    "timeout", "max_retries",
     "api_key", "callbacks", "http_client", "http_async_client",
 )
 
@@ -163,6 +163,14 @@ class OpenAIClient(BaseLLMClient):
         for key in _PASSTHROUGH_KWARGS:
             if key in self.kwargs:
                 llm_kwargs[key] = self.kwargs[key]
+
+        # Some OpenAI chat models reject ``reasoning.effort`` with HTTP 400.
+        # Keep the CLI option useful for o-series reasoning models while
+        # avoiding hard failures for GPT chat models during normal analysis.
+        if self.provider == "openai" and self.model.startswith("o"):
+            reasoning_effort = self.kwargs.get("reasoning_effort")
+            if reasoning_effort:
+                llm_kwargs["reasoning_effort"] = reasoning_effort
 
         # Native OpenAI: use Responses API for consistent behavior across
         # all model families. Third-party providers use Chat Completions.

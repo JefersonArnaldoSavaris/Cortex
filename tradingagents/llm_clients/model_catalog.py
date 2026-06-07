@@ -44,10 +44,11 @@ MODEL_OPTIONS: ProviderModeOptions = {
             ("Gemini 2.5 Flash Lite - Fast, low-cost", "gemini-2.5-flash-lite"),
         ],
         "deep": [
+            ("Gemini 2.5 Flash Lite - Fast, low-cost", "gemini-2.5-flash-lite"),
+            ("Gemini 2.5 Flash - Balanced, stable", "gemini-2.5-flash"),
             ("Gemini 3.1 Pro - Reasoning-first, complex workflows", "gemini-3.1-pro-preview"),
             ("Gemini 3 Flash - Next-gen fast", "gemini-3-flash-preview"),
             ("Gemini 2.5 Pro - Stable pro model", "gemini-2.5-pro"),
-            ("Gemini 2.5 Flash - Balanced, stable", "gemini-2.5-flash"),
         ],
     },
     "xai": {
@@ -101,17 +102,31 @@ MODEL_OPTIONS: ProviderModeOptions = {
             ("Custom model ID", "custom"),
         ],
     },
-    # OpenRouter: fetched dynamically. Azure: any deployed model name.
-    "ollama": {
+    "openrouter": {
         "quick": [
-            ("Qwen3:latest (8B, local)", "qwen3:latest"),
-            ("GPT-OSS:latest (20B, local)", "gpt-oss:latest"),
-            ("GLM-4.7-Flash:latest (30B, local)", "glm-4.7-flash:latest"),
+            ("OpenAI GPT-OSS 20B (free)", "openai/gpt-oss-20b:free"),
+            ("NVIDIA Nemotron 3 Nano 30B A3B (free)", "nvidia/nemotron-3-nano-30b-a3b:free"),
+            ("OpenRouter Free Router", "openrouter/free"),
+            ("Custom model ID", "custom"),
         ],
         "deep": [
-            ("GLM-4.7-Flash:latest (30B, local)", "glm-4.7-flash:latest"),
-            ("GPT-OSS:latest (20B, local)", "gpt-oss:latest"),
+            ("OpenAI GPT-OSS 20B (free)", "openai/gpt-oss-20b:free"),
+            ("NVIDIA Nemotron 3 Nano 30B A3B (free)", "nvidia/nemotron-3-nano-30b-a3b:free"),
+            ("OpenRouter Free Router", "openrouter/free"),
+            ("Custom model ID", "custom"),
+        ],
+    },
+    # Azure: any deployed model name.
+    "ollama": {
+        "quick": [
+            ("Qwen2.5:0.5B (local leve)", "qwen2.5:0.5b"),
             ("Qwen3:latest (8B, local)", "qwen3:latest"),
+            ("Custom model ID", "custom"),
+        ],
+        "deep": [
+            ("Qwen2.5:0.5B (local leve)", "qwen2.5:0.5b"),
+            ("Qwen3:latest (8B, local)", "qwen3:latest"),
+            ("Custom model ID", "custom"),
         ],
     },
 }
