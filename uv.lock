@@ -3498,7 +3498,7 @@ wheels = [
 ]
 
 [[package]]
-name = "tradingagents"
+name = "cortex"
 version = "0.2.0"
 source = { editable = "." }
 dependencies = [

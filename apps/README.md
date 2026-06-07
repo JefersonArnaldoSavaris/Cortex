@@ -1,6 +1,6 @@
-# TradingAgents Product Apps
+# Cortex Product Apps
 
-This folder starts the commercial product layer around the existing TradingAgents engine.
+This folder starts the commercial product layer around the existing Cortex engine.
 
 ## Current MVP
 
@@ -12,15 +12,15 @@ This folder starts the commercial product layer around the existing TradingAgent
 Terminal 1:
 
 ```bash
-cd TradingAgents
+cd Cortex
 source .venv/bin/activate
-uvicorn apps.api.tradingagents_api.main:app --reload --port 8000
+uvicorn apps.api.cortex_api.main:app --reload --port 8000
 ```
 
 Terminal 2:
 
 ```bash
-cd TradingAgents/apps/web
+cd Cortex/apps/web
 npm install
 npm run dev
 ```
@@ -31,8 +31,8 @@ Open `http://localhost:3000`.
 
 The API now persists analyses and timeline events in a relational database.
 
-- Local development default: `sqlite:///./tradingagents_app.db`
-- Production target: PostgreSQL via `DATABASE_URL` or `TRADINGAGENTS_DATABASE_URL`
+- Local development default: `sqlite:///./cortex_app.db`
+- Production target: PostgreSQL via `DATABASE_URL` or `CORTEX_DATABASE_URL`
 
 Reports continue to be written to `reports/`, and the final markdown is also stored in the database for easier product retrieval.
 
@@ -41,7 +41,7 @@ Reports continue to be written to `reports/`, and the final markdown is also sto
 This is now a better SaaS foundation, but we still need the next product layers before commercial launch:
 
 - PostgreSQL as the primary production database.
-- Celery workers for long-running TradingAgents executions.
+- Celery workers for long-running Cortex executions.
 - Redis or RabbitMQ as the task broker.
 - Object storage for large report artifacts.
 - Auth, billing, per-user provider keys, and usage limits.

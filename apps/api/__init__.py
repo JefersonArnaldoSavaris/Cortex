@@ -1,1 +1,1 @@
-"""Backend API package for the TradingAgents SaaS layer."""
+"""Backend API package for the Cortex SaaS layer."""

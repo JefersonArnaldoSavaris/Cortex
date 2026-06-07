@@ -3,9 +3,9 @@ requires = ["setuptools>=61.0"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "tradingagents"
+name = "cortex"
 version = "0.2.4"
-description = "TradingAgents: Multi-Agents LLM Financial Trading Framework"
+description = "Cortex: Multi-Agents LLM Financial Trading Framework"
 readme = "README.md"
 requires-python = ">=3.10"
 dependencies = [
@@ -37,10 +37,10 @@ dependencies = [
 ]
 
 [project.scripts]
-tradingagents = "cli.main:app"
+cortex = "cli.main:app"
 
 [tool.setuptools.packages.find]
-include = ["tradingagents*", "cli*", "apps*"]
+include = ["cortex*", "cli*", "apps*"]
 
 [tool.setuptools.package-data]
 cli = ["static/*"]

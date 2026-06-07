@@ -1,4 +1,4 @@
-# TradingAgents Web
+# Cortex Web
 
 Next.js frontend for the commercial product direction.
 
@@ -7,7 +7,7 @@ Next.js frontend for the commercial product direction.
 Node.js is required.
 
 ```bash
-cd TradingAgents/apps/web
+cd Cortex/apps/web
 npm install
 npm run dev
 ```
@@ -15,5 +15,5 @@ npm run dev
 The app expects the API at `http://localhost:8000`. Override it with:
 
 ```bash
-NEXT_PUBLIC_TRADINGAGENTS_API_URL=http://localhost:8000 npm run dev
+NEXT_PUBLIC_CORTEX_API_URL=http://localhost:8000 npm run dev
 ```

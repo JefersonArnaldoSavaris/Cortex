@@ -63,7 +63,7 @@ type OptionsResponse = {
   default_request: AnalysisRequest;
 };
 
-const API_URL = process.env.NEXT_PUBLIC_TRADINGAGENTS_API_URL ?? "http://localhost:8000";
+const API_URL = process.env.NEXT_PUBLIC_CORTEX_API_URL ?? "http://localhost:8000";
 
 const analystOptions = [
   { value: "market", label: "Mercado" },
@@ -120,7 +120,7 @@ const periodOptionsByInterval: Record<string, Array<{ value: string; label: stri
 const eventLabels: Record<string, string> = {
   "Analysis queued": "Análise adicionada à fila",
   "Worker started": "Processamento iniciado",
-  "Building TradingAgents graph": "Preparando agentes",
+  "Building Cortex graph": "Preparando agentes",
   "Report saved": "Relatório salvo",
 };
 
@@ -222,7 +222,7 @@ function getProgressStepIndex(events: AnalysisRecord["events"], status: Analysis
   if (Array.from(messages).some((message) => message.startsWith("Running "))) {
     return 3;
   }
-  if (messages.has("Building TradingAgents graph")) {
+  if (messages.has("Building Cortex graph")) {
     return 2;
   }
   if (messages.has("Worker started") || status === "running") {
@@ -514,7 +514,7 @@ export default function Dashboard() {
             <BarChart3 size={22} />
           </div>
           <div>
-            <h1>TradingAgents</h1>
+            <h1>Cortex</h1>
             <span>Console de análises</span>
           </div>
         </div>

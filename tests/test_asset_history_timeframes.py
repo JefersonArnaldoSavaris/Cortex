@@ -6,7 +6,7 @@ import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from apps.api.tradingagents_api.service import _resample_ohlc, _validate_history_request
+from apps.api.cortex_api.service import _resample_ohlc, _validate_history_request
 
 
 @pytest.mark.unit

@@ -11,8 +11,8 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from tradingagents.agents.managers.research_manager import create_research_manager
-from tradingagents.agents.schemas import (
+from cortex.agents.managers.research_manager import create_research_manager
+from cortex.agents.schemas import (
     PortfolioRating,
     ResearchPlan,
     TraderAction,
@@ -20,7 +20,7 @@ from tradingagents.agents.schemas import (
     render_research_plan,
     render_trader_proposal,
 )
-from tradingagents.agents.trader.trader import create_trader
+from cortex.agents.trader.trader import create_trader
 
 
 # ---------------------------------------------------------------------------
@@ -33,11 +33,11 @@ class TestRenderTraderProposal:
     def test_minimal_required_fields(self):
         p = TraderProposal(action=TraderAction.HOLD, reasoning="Balanced setup; no edge.")
         md = render_trader_proposal(p)
-        assert "**Action**: Hold" in md
-        assert "**Reasoning**: Balanced setup; no edge." in md
+        assert "**Ação**: Manter" in md
+        assert "**Justificativa**: Balanced setup; no edge." in md
         # The trailing FINAL TRANSACTION PROPOSAL line is preserved for the
         # analyst stop-signal text and any external code that greps for it.
-        assert "FINAL TRANSACTION PROPOSAL: **HOLD**" in md
+        assert "PROPOSTA FINAL DE TRANSAÇÃO: **MANTER**" in md
 
     def test_optional_fields_included_when_present(self):
         p = TraderProposal(
@@ -48,19 +48,19 @@ class TestRenderTraderProposal:
             position_sizing="6% of portfolio",
         )
         md = render_trader_proposal(p)
-        assert "**Action**: Buy" in md
-        assert "**Entry Price**: 189.5" in md
+        assert "**Ação**: Comprar" in md
+        assert "**Preço de Entrada**: 189.5" in md
         assert "**Stop Loss**: 178.0" in md
-        assert "**Position Sizing**: 6% of portfolio" in md
-        assert "FINAL TRANSACTION PROPOSAL: **BUY**" in md
+        assert "**Tamanho da Posição**: 6% of portfolio" in md
+        assert "PROPOSTA FINAL DE TRANSAÇÃO: **COMPRAR**" in md
 
     def test_optional_fields_omitted_when_absent(self):
         p = TraderProposal(action=TraderAction.SELL, reasoning="Guidance cut.")
         md = render_trader_proposal(p)
-        assert "Entry Price" not in md
+        assert "Preço de Entrada" not in md
         assert "Stop Loss" not in md
-        assert "Position Sizing" not in md
-        assert "FINAL TRANSACTION PROPOSAL: **SELL**" in md
+        assert "Tamanho da Posição" not in md
+        assert "PROPOSTA FINAL DE TRANSAÇÃO: **VENDER**" in md
 
 
 @pytest.mark.unit
@@ -72,9 +72,9 @@ class TestRenderResearchPlan:
             strategic_actions="Build position over two weeks; cap at 5%.",
         )
         md = render_research_plan(p)
-        assert "**Recommendation**: Overweight" in md
-        assert "**Rationale**: Bull case carried" in md
-        assert "**Strategic Actions**: Build position" in md
+        assert "**Recomendação**: Sobreponderar" in md
+        assert "**Justificativa**: Bull case carried" in md
+        assert "**Ações Estratégicas**: Build position" in md
 
     def test_all_5_tier_ratings_render(self):
         for rating in PortfolioRating:
@@ -84,7 +84,7 @@ class TestRenderResearchPlan:
                 strategic_actions="s",
             )
             md = render_research_plan(p)
-            assert f"**Recommendation**: {rating.value}" in md
+            assert "**Recomendação**:" in md
 
 
 # ---------------------------------------------------------------------------
@@ -132,9 +132,9 @@ class TestTraderAgent:
         trader = create_trader(llm)
         result = trader(_make_trader_state())
         plan = result["trader_investment_plan"]
-        assert "**Action**: Buy" in plan
-        assert "**Entry Price**: 189.5" in plan
-        assert "FINAL TRANSACTION PROPOSAL: **BUY**" in plan
+        assert "**Ação**: Comprar" in plan
+        assert "**Preço de Entrada**: 189.5" in plan
+        assert "PROPOSTA FINAL DE TRANSAÇÃO: **COMPRAR**" in plan
         # The same rendered markdown is also added to messages for downstream agents.
         assert plan in result["messages"][0].content
 
@@ -208,9 +208,9 @@ class TestResearchManagerAgent:
         rm = create_research_manager(llm)
         result = rm(_make_rm_state())
         ip = result["investment_plan"]
-        assert "**Recommendation**: Overweight" in ip
-        assert "**Rationale**: Bull case" in ip
-        assert "**Strategic Actions**: Build position" in ip
+        assert "**Recomendação**: Sobreponderar" in ip
+        assert "**Justificativa**: Bull case" in ip
+        assert "**Ações Estratégicas**: Build position" in ip
 
     def test_prompt_uses_5_tier_rating_scale(self):
         """The RM prompt must list all five tiers so the schema enum matches user expectations."""

@@ -1,1 +1,1 @@
-"""Product application packages for the TradingAgents SaaS layer."""
+"""Product application packages for the Cortex SaaS layer."""

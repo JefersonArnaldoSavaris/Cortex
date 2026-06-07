@@ -6,17 +6,17 @@ import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from apps.api.tradingagents_api.models import AnalysisRequest, AnalysisStatus
+from apps.api.cortex_api.models import AnalysisRequest, AnalysisStatus
 
 
 @pytest.mark.unit
 def test_analysis_repository_persists_records_and_events(tmp_path, monkeypatch):
     database_url = f"sqlite:///{tmp_path / 'analysis-test.db'}"
-    monkeypatch.setenv("TRADINGAGENTS_DATABASE_URL", database_url)
+    monkeypatch.setenv("CORTEX_DATABASE_URL", database_url)
 
-    import apps.api.tradingagents_api.db as db_module
-    import apps.api.tradingagents_api.orm as orm_module
-    import apps.api.tradingagents_api.repository as repository_module
+    import apps.api.cortex_api.db as db_module
+    import apps.api.cortex_api.orm as orm_module
+    import apps.api.cortex_api.repository as repository_module
 
     importlib.reload(db_module)
     importlib.reload(orm_module)
