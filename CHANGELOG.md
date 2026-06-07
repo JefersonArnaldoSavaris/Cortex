@@ -209,7 +209,7 @@ production-ready surfaces.
 - **Post-analysis report saving** — the framework writes per-section markdown
   files (analyst reports, debate transcripts, final decision) when a run
   completes.
-- **Announcements panel** — fetches updates from `api.tauric.ai/v1/announcements`
+- **Announcements panel** — fetches updates from ``
   for the CLI welcome screen.
 - **Tool fallbacks** so a single vendor outage does not stop the pipeline.
 
@@ -257,10 +257,10 @@ PRs from late 2025 also landed here.
   portfolio manager. LangGraph orchestration, yfinance data, per-agent
   BM25 memory, single-provider OpenAI integration, interactive CLI.
 
-[0.2.4]: https://github.com/TauricResearch/TradingAgents/compare/v0.2.3...v0.2.4
-[0.2.3]: https://github.com/TauricResearch/TradingAgents/compare/v0.2.2...v0.2.3
-[0.2.2]: https://github.com/TauricResearch/TradingAgents/compare/v0.2.1...v0.2.2
-[0.2.1]: https://github.com/TauricResearch/TradingAgents/compare/v0.2.0...v0.2.1
-[0.2.0]: https://github.com/TauricResearch/TradingAgents/compare/v0.1.1...v0.2.0
-[0.1.1]: https://github.com/TauricResearch/TradingAgents/compare/v0.1.0...v0.1.1
-[0.1.0]: https://github.com/TauricResearch/TradingAgents/releases/tag/v0.1.0
+[0.2.4]: https://github.com/JefersonArnaldoSavaris/TradingAgents/compare/v0.2.3...v0.2.4
+[0.2.3]: https://github.com/JefersonArnaldoSavaris/TradingAgents/compare/v0.2.2...v0.2.3
+[0.2.2]: https://github.com/JefersonArnaldoSavaris/TradingAgents/compare/v0.2.1...v0.2.2
+[0.2.1]: https://github.com/JefersonArnaldoSavaris/TradingAgents/compare/v0.2.0...v0.2.1
+[0.2.0]: https://github.com/JefersonArnaldoSavaris/TradingAgents/compare/v0.1.1...v0.2.0
+[0.1.1]: https://github.com/JefersonArnaldoSavaris/TradingAgents/compare/v0.1.0...v0.1.1
+[0.1.0]: https://github.com/JefersonArnaldoSavaris/TradingAgents/releases/tag/v0.1.0

@@ -12,7 +12,7 @@ This folder starts the commercial product layer around the existing TradingAgent
 Terminal 1:
 
 ```bash
-cd "/home/jefe/dev/Tauric Research/TradingAgents"
+cd TradingAgents
 source .venv/bin/activate
 uvicorn apps.api.tradingagents_api.main:app --reload --port 8000
 ```
@@ -20,7 +20,7 @@ uvicorn apps.api.tradingagents_api.main:app --reload --port 8000
 Terminal 2:
 
 ```bash
-cd "/home/jefe/dev/Tauric Research/TradingAgents/apps/web"
+cd TradingAgents/apps/web
 npm install
 npm run dev
 ```

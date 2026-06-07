@@ -5,7 +5,7 @@ Development API for turning the current CLI-oriented agent runner into a web pro
 ## Run
 
 ```bash
-cd "/home/jefe/dev/Tauric Research/TradingAgents"
+cd TradingAgents
 source .venv/bin/activate
 uvicorn apps.api.tradingagents_api.main:app --reload --port 8000
 ```
