@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from cortex.trading_opportunities import OpportunityRequest, TradingOpportunityAgent
+from cortex.trading_opportunities.schemas import OpportunityAnalysisResult
 
 from .repository import init_db
 from .models import (
@@ -13,6 +15,9 @@ from .models import (
     ReportResponse,
 )
 from .service import analysis_service, get_asset_history, get_assets
+
+
+opportunity_agent = TradingOpportunityAgent()
 
 
 app = FastAPI(
@@ -61,6 +66,16 @@ def asset_history(symbol: str, period: str = "6mo", interval: str = "1d") -> Ass
 @app.post("/analyses", response_model=AnalysisCreateResponse, status_code=202)
 def create_analysis(request: AnalysisRequest) -> AnalysisCreateResponse:
     return analysis_service.create_analysis(request)
+
+
+@app.post("/opportunities/analyze", response_model=OpportunityAnalysisResult)
+def analyze_opportunity(request: OpportunityRequest) -> OpportunityAnalysisResult:
+    try:
+        return opportunity_agent.analyze(request)
+    except NotImplementedError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
 
 
 @app.get("/analyses", response_model=AnalysisListResponse)

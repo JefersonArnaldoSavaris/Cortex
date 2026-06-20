@@ -5,7 +5,7 @@ This folder starts the commercial product layer around the existing Cortex engin
 ## Current MVP
 
 - `api/`: FastAPI backend that exposes analysis jobs over HTTP.
-- `web/`: Next.js frontend for creating analyses and reading reports.
+- `web/`: Next.js frontend for creating analyses, reading reports, and analyzing short-term opportunities.
 
 ## Development Flow
 
@@ -13,7 +13,7 @@ Terminal 1:
 
 ```bash
 cd Cortex
-source .venv/bin/activate
+source .venv-cortex/bin/activate  # or your project virtualenv
 uvicorn apps.api.cortex_api.main:app --reload --port 8000
 ```
 
@@ -26,6 +26,30 @@ npm run dev
 ```
 
 Open `http://localhost:3000`.
+
+## Trading Opportunities
+
+The API exposes a read-only short-term signal endpoint:
+
+```bash
+curl -X POST http://localhost:8000/opportunities/analyze \
+  -H "Content-Type: application/json" \
+  -d '{
+    "symbol": "SPY",
+    "strategy_type": "daytrade",
+    "timeframe": "M15",
+    "risk_profile": "moderado",
+    "capital": 10000,
+    "max_risk_per_trade": 0.01,
+    "max_signals": 1,
+    "provider": "mock",
+    "limit": 160
+  }'
+```
+
+In the web app, open the `Oportunidades` tab, fill the form, and run
+`Analisar oportunidade`. Results are educational technical signals only. The
+MT5 provider remains a non-executing safety stub and no real orders are placed.
 
 ## Persistence
 

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { BarChart3, FileText, LineChart, Play, RefreshCw } from "lucide-react";
+import { BarChart3, FileText, LineChart, Play, RefreshCw, ShieldAlert, Target } from "lucide-react";
 import { CandlestickSeries, ColorType, UTCTimestamp, createChart } from "lightweight-charts";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
@@ -55,6 +55,51 @@ type AssetHistoryResponse = {
   period: string;
   interval: string;
   points: PricePoint[];
+};
+
+type OpportunityDirection = "BUY" | "SELL" | "WAIT" | "AVOID";
+type OpportunityStrategyType = "daytrade" | "swingtrade";
+type OpportunityTimeframe = "M1" | "M5" | "M15" | "M30" | "H1" | "H4" | "D1";
+type OpportunityRiskProfile = "conservador" | "moderado" | "agressivo";
+type OpportunityProvider = "mock" | "yfinance" | "mt5";
+
+type OpportunityRequest = {
+  symbol: string;
+  strategy_type: OpportunityStrategyType;
+  timeframe: OpportunityTimeframe;
+  risk_profile: OpportunityRiskProfile;
+  capital: number;
+  max_risk_per_trade: number;
+  max_signals: number;
+  provider: OpportunityProvider;
+  limit: number;
+};
+
+type OpportunitySignal = {
+  symbol: string;
+  strategy_type: OpportunityStrategyType;
+  timeframe: OpportunityTimeframe;
+  direction: OpportunityDirection;
+  confidence_score: number;
+  setup_name: string;
+  entry_price?: number | null;
+  stop_loss?: number | null;
+  take_profit?: number | null;
+  risk_reward_ratio?: number | null;
+  position_size: number;
+  max_loss: number;
+  technical_reasons: string[];
+  risk_reasons: string[];
+  invalidation_criteria: string[];
+  warnings: string[];
+  generated_at: string;
+};
+
+type OpportunityResult = {
+  request: OpportunityRequest;
+  signals: OpportunitySignal[];
+  warnings: string[];
+  generated_at: string;
 };
 
 type OptionsResponse = {
@@ -131,6 +176,33 @@ const intervalLabels: Record<string, string> = {
   "1h": "1 hora",
   "4h": "4 horas",
   "1d": "1 dia",
+};
+
+const timeframeToChartInterval: Record<OpportunityTimeframe, string> = {
+  M1: "1m",
+  M5: "5m",
+  M15: "15m",
+  M30: "15m",
+  H1: "1h",
+  H4: "4h",
+  D1: "1d",
+};
+
+const opportunityTimeframes: Array<{ value: OpportunityTimeframe; label: string }> = [
+  { value: "M1", label: "M1" },
+  { value: "M5", label: "M5" },
+  { value: "M15", label: "M15" },
+  { value: "M30", label: "M30" },
+  { value: "H1", label: "H1" },
+  { value: "H4", label: "H4" },
+  { value: "D1", label: "D1" },
+];
+
+const directionLabels: Record<OpportunityDirection, string> = {
+  BUY: "Compra",
+  SELL: "Venda",
+  WAIT: "Aguardar",
+  AVOID: "Evitar",
 };
 
 const reportTranslations: Array<[RegExp, string]> = [
@@ -246,7 +318,17 @@ function getProgressStages(events: AnalysisRecord["events"], status: AnalysisSta
   });
 }
 
-function CandleChart({ points, interval, period }: { points: PricePoint[]; interval: string; period: string }) {
+function CandleChart({
+  points,
+  interval,
+  period,
+  opportunity,
+}: {
+  points: PricePoint[];
+  interval: string;
+  period: string;
+  opportunity?: OpportunitySignal | null;
+}) {
   const containerRef = useRef<HTMLDivElement | null>(null);
 
   const stats = useMemo(() => {
@@ -307,10 +389,41 @@ function CandleChart({ points, interval, period }: { points: PricePoint[]; inter
         close: point.close,
       })),
     );
+
+    if (opportunity?.entry_price) {
+      series.createPriceLine({
+        price: opportunity.entry_price,
+        color: "#2563eb",
+        lineWidth: 2,
+        lineStyle: 2,
+        axisLabelVisible: true,
+        title: "Entrada",
+      });
+    }
+    if (opportunity?.stop_loss) {
+      series.createPriceLine({
+        price: opportunity.stop_loss,
+        color: "#dc2626",
+        lineWidth: 2,
+        lineStyle: 2,
+        axisLabelVisible: true,
+        title: "Stop",
+      });
+    }
+    if (opportunity?.take_profit) {
+      series.createPriceLine({
+        price: opportunity.take_profit,
+        color: "#16a34a",
+        lineWidth: 2,
+        lineStyle: 2,
+        axisLabelVisible: true,
+        title: "Alvo",
+      });
+    }
     chart.timeScale().fitContent();
 
     return () => chart.remove();
-  }, [interval, points]);
+  }, [interval, opportunity?.entry_price, opportunity?.stop_loss, opportunity?.take_profit, points]);
 
   if (!stats) {
     return <div className="chartEmpty">Sem dados suficientes para plotar o gráfico.</div>;
@@ -338,6 +451,30 @@ function CandleChart({ points, interval, period }: { points: PricePoint[]; inter
         <span>{formatPointLabel(stats.first.date, interval)}</span>
         <span>{formatPointLabel(stats.last.date, interval)}</span>
       </div>
+      {opportunity?.entry_price || opportunity?.stop_loss || opportunity?.take_profit ? (
+        <div className="levelLegend" aria-label="Níveis da oportunidade">
+          {opportunity.entry_price ? <span className="levelLegendEntry">Entrada {formatPrice(opportunity.entry_price)}</span> : null}
+          {opportunity.stop_loss ? <span className="levelLegendStop">Stop {formatPrice(opportunity.stop_loss)}</span> : null}
+          {opportunity.take_profit ? <span className="levelLegendTarget">Alvo {formatPrice(opportunity.take_profit)}</span> : null}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+function ReasonBlock({ title, items }: { title: string; items: string[] }) {
+  return (
+    <div className="reasonBlock">
+      <h4>{title}</h4>
+      {items.length > 0 ? (
+        <ul>
+          {items.map((item, index) => (
+            <li key={`${title}-${index}`}>{item}</li>
+          ))}
+        </ul>
+      ) : (
+        <p>Nenhum item informado.</p>
+      )}
     </div>
   );
 }
@@ -348,12 +485,15 @@ export default function Dashboard() {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [report, setReport] = useState("");
   const [history, setHistory] = useState<PricePoint[]>([]);
-  const [activeView, setActiveView] = useState<"mercado" | "analises">("mercado");
+  const [activeView, setActiveView] = useState<"mercado" | "oportunidades" | "analises">("mercado");
   const [chartInterval, setChartInterval] = useState("1d");
   const [chartPeriod, setChartPeriod] = useState("6mo");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isOpportunityLoading, setIsOpportunityLoading] = useState(false);
   const [isChartLoading, setIsChartLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [opportunityError, setOpportunityError] = useState<string | null>(null);
+  const [opportunityResult, setOpportunityResult] = useState<OpportunityResult | null>(null);
   const [form, setForm] = useState<AnalysisRequest>({
     ticker: "SPY",
     analysis_date: today(),
@@ -366,6 +506,17 @@ export default function Dashboard() {
     mode: "quick_technical",
     checkpoint: false,
   });
+  const [opportunityForm, setOpportunityForm] = useState<OpportunityRequest>({
+    symbol: "SPY",
+    strategy_type: "daytrade",
+    timeframe: "M15",
+    risk_profile: "moderado",
+    capital: 10_000,
+    max_risk_per_trade: 0.01,
+    max_signals: 1,
+    provider: "mock",
+    limit: 160,
+  });
 
   const providerModels = useMemo(() => options?.providers[form.provider], [form.provider, options]);
   const completedAnalyses = analyses.filter((analysis) => analysis.status === "completed");
@@ -376,6 +527,7 @@ export default function Dashboard() {
   const selectedAnalysis =
     completedAnalyses.find((analysis) => analysis.id === selectedId) ?? completedAnalyses[0] ?? null;
   const selectedAsset = options?.assets.find((asset) => asset.symbol === form.ticker);
+  const opportunitySignal = opportunityResult?.signals[0] ?? null;
   const periodOptions = periodOptionsByInterval[chartInterval] ?? periodOptionsByInterval["1d"];
   const activeChartPeriod = periodOptions.some((period) => period.value === chartPeriod)
     ? chartPeriod
@@ -493,6 +645,36 @@ export default function Dashboard() {
       setError(err instanceof Error ? err.message : "Erro inesperado.");
     } finally {
       setIsSubmitting(false);
+    }
+  }
+
+  async function submitOpportunity(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setIsOpportunityLoading(true);
+    setOpportunityError(null);
+    setError(null);
+    try {
+      const response = await fetch(`${API_URL}/opportunities/analyze`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(opportunityForm),
+      });
+      if (!response.ok) {
+        const body = await response.json().catch(() => null);
+        const detail = typeof body?.detail === "string" ? body.detail : "Não foi possível analisar a oportunidade.";
+        throw new Error(detail);
+      }
+      const data = (await response.json()) as OpportunityResult;
+      setOpportunityResult(data);
+      const nextInterval = timeframeToChartInterval[opportunityForm.timeframe];
+      updateChartInterval(nextInterval);
+      setForm((current) => ({ ...current, ticker: opportunityForm.symbol }));
+      setActiveView("oportunidades");
+    } catch (err) {
+      setOpportunityResult(null);
+      setOpportunityError(err instanceof Error ? err.message : "Erro inesperado ao analisar oportunidade.");
+    } finally {
+      setIsOpportunityLoading(false);
     }
   }
 
@@ -648,6 +830,14 @@ export default function Dashboard() {
           >
             Análises e histórico
           </button>
+          <button
+            className={activeView === "oportunidades" ? "viewTab active" : "viewTab"}
+            onClick={() => setActiveView("oportunidades")}
+            role="tab"
+            type="button"
+          >
+            Oportunidades
+          </button>
         </div>
 
         {activeView === "mercado" ? (
@@ -697,8 +887,213 @@ export default function Dashboard() {
             {isChartLoading ? (
               <div className="chartEmpty">Carregando gráfico...</div>
             ) : (
-              <CandleChart points={history} interval={chartInterval} period={activeChartPeriod} />
+              <CandleChart points={history} interval={chartInterval} period={activeChartPeriod} opportunity={opportunitySignal} />
             )}
+          </section>
+        ) : activeView === "oportunidades" ? (
+          <section className="opportunitiesGrid">
+            <div className="opportunityPanel">
+              <div className="sectionTitle">
+                <Target size={18} />
+                <h3>
+                  Oportunidades
+                  <span>Sinais técnicos preliminares para Day Trade e Swing Trade</span>
+                </h3>
+              </div>
+
+              <div className="riskNotice">
+                <ShieldAlert size={18} />
+                <span>Análise educacional. Não é recomendação financeira e não executa ordens reais.</span>
+              </div>
+
+              <form className="opportunityForm" onSubmit={submitOpportunity}>
+                <label>
+                  Ativo
+                  <input
+                    value={opportunityForm.symbol}
+                    onChange={(event) => setOpportunityForm({ ...opportunityForm, symbol: event.target.value.toUpperCase() })}
+                  />
+                </label>
+
+                <label>
+                  Tipo
+                  <select
+                    value={opportunityForm.strategy_type}
+                    onChange={(event) =>
+                      setOpportunityForm({ ...opportunityForm, strategy_type: event.target.value as OpportunityStrategyType })
+                    }
+                  >
+                    <option value="daytrade">Day Trade</option>
+                    <option value="swingtrade">Swing Trade</option>
+                  </select>
+                </label>
+
+                <label>
+                  Timeframe
+                  <select
+                    value={opportunityForm.timeframe}
+                    onChange={(event) => setOpportunityForm({ ...opportunityForm, timeframe: event.target.value as OpportunityTimeframe })}
+                  >
+                    {opportunityTimeframes.map((timeframe) => (
+                      <option key={timeframe.value} value={timeframe.value}>
+                        {timeframe.label}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+
+                <label>
+                  Perfil de risco
+                  <select
+                    value={opportunityForm.risk_profile}
+                    onChange={(event) =>
+                      setOpportunityForm({ ...opportunityForm, risk_profile: event.target.value as OpportunityRiskProfile })
+                    }
+                  >
+                    <option value="conservador">Conservador</option>
+                    <option value="moderado">Moderado</option>
+                    <option value="agressivo">Agressivo</option>
+                  </select>
+                </label>
+
+                <label>
+                  Capital
+                  <input
+                    min={1}
+                    step={100}
+                    type="number"
+                    value={opportunityForm.capital}
+                    onChange={(event) => setOpportunityForm({ ...opportunityForm, capital: Number(event.target.value) })}
+                  />
+                </label>
+
+                <label>
+                  Risco máximo por operação
+                  <input
+                    max={1}
+                    min={0.001}
+                    step={0.001}
+                    type="number"
+                    value={opportunityForm.max_risk_per_trade}
+                    onChange={(event) => setOpportunityForm({ ...opportunityForm, max_risk_per_trade: Number(event.target.value) })}
+                  />
+                </label>
+
+                <label>
+                  Provider
+                  <select
+                    value={opportunityForm.provider}
+                    onChange={(event) => setOpportunityForm({ ...opportunityForm, provider: event.target.value as OpportunityProvider })}
+                  >
+                    <option value="mock">Mock</option>
+                    <option value="yfinance">yFinance</option>
+                    <option value="mt5">MT5 stub</option>
+                  </select>
+                </label>
+
+                <label>
+                  Máx. sinais
+                  <input
+                    max={20}
+                    min={1}
+                    type="number"
+                    value={opportunityForm.max_signals}
+                    onChange={(event) => setOpportunityForm({ ...opportunityForm, max_signals: Number(event.target.value) })}
+                  />
+                </label>
+
+                <label>
+                  Barras OHLCV
+                  <input
+                    max={1000}
+                    min={50}
+                    type="number"
+                    value={opportunityForm.limit}
+                    onChange={(event) => setOpportunityForm({ ...opportunityForm, limit: Number(event.target.value) })}
+                  />
+                </label>
+
+                <button className="primaryButton opportunitySubmit" disabled={isOpportunityLoading} type="submit">
+                  {isOpportunityLoading ? <RefreshCw size={17} /> : <Target size={17} />}
+                  Analisar oportunidade
+                </button>
+              </form>
+            </div>
+
+            <div className="opportunityPanel">
+              <div className="sectionTitle">
+                <LineChart size={18} />
+                <h3>
+                  Resultado
+                  <span>Níveis também aparecem no gráfico de mercado quando disponíveis</span>
+                </h3>
+              </div>
+
+              {opportunityError ? <div className="errorBanner">{opportunityError}</div> : null}
+
+              {isOpportunityLoading ? (
+                <div className="chartEmpty">Analisando oportunidade...</div>
+              ) : !opportunityResult ? (
+                <p className="emptyState">Preencha os parâmetros e execute uma análise de oportunidade.</p>
+              ) : opportunityResult.signals.length === 0 ? (
+                <p className="emptyState">Nenhum sinal retornado para os parâmetros informados.</p>
+              ) : (
+                <div className="opportunityResults">
+                  {opportunityResult.signals.map((signal, index) => (
+                    <article className="opportunityCard" key={`${signal.symbol}-${signal.setup_name}-${index}`}>
+                      <div className="opportunityHeader">
+                        <span className={`directionBadge directionBadge--${signal.direction.toLowerCase()}`}>
+                          {signal.direction} · {directionLabels[signal.direction]}
+                        </span>
+                        <span>{new Date(signal.generated_at).toLocaleString("pt-BR")}</span>
+                      </div>
+
+                      <div className="opportunityMetrics">
+                        <div>
+                          <span>Score</span>
+                          <strong>{Math.round(signal.confidence_score * 100)}%</strong>
+                        </div>
+                        <div>
+                          <span>Setup</span>
+                          <strong>{signal.setup_name}</strong>
+                        </div>
+                        <div>
+                          <span>Entrada</span>
+                          <strong>{signal.entry_price ? formatPrice(signal.entry_price) : "-"}</strong>
+                        </div>
+                        <div>
+                          <span>Stop</span>
+                          <strong>{signal.stop_loss ? formatPrice(signal.stop_loss) : "-"}</strong>
+                        </div>
+                        <div>
+                          <span>Take profit</span>
+                          <strong>{signal.take_profit ? formatPrice(signal.take_profit) : "-"}</strong>
+                        </div>
+                        <div>
+                          <span>Risco/retorno</span>
+                          <strong>{signal.risk_reward_ratio ?? "-"}</strong>
+                        </div>
+                        <div>
+                          <span>Posição</span>
+                          <strong>{formatPrice(signal.position_size)}</strong>
+                        </div>
+                        <div>
+                          <span>Perda máxima</span>
+                          <strong>{formatPrice(signal.max_loss)}</strong>
+                        </div>
+                      </div>
+
+                      <div className="reasonGrid">
+                        <ReasonBlock title="Razões técnicas" items={signal.technical_reasons} />
+                        <ReasonBlock title="Razões de risco" items={signal.risk_reasons} />
+                        <ReasonBlock title="Invalidação" items={signal.invalidation_criteria} />
+                        <ReasonBlock title="Alertas" items={[...signal.warnings, ...opportunityResult.warnings]} />
+                      </div>
+                    </article>
+                  ))}
+                </div>
+              )}
+            </div>
           </section>
         ) : (
           <section className="detailPanel detailPanelFull">

@@ -282,7 +282,8 @@ select {
 
 .runsPanel,
 .detailPanel,
-.chartPanel {
+.chartPanel,
+.opportunityPanel {
   background: var(--panel);
   border: 1px solid var(--line);
   border-radius: 8px;
@@ -643,6 +644,35 @@ select {
   margin-top: 8px;
 }
 
+.levelLegend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.levelLegend span {
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 800;
+  padding: 5px 9px;
+}
+
+.levelLegendEntry {
+  background: #dbeafe;
+  color: #1d4ed8;
+}
+
+.levelLegendStop {
+  background: #fee2e2;
+  color: #b91c1c;
+}
+
+.levelLegendTarget {
+  background: #dcfce7;
+  color: #15803d;
+}
+
 .chartEmpty {
   align-items: center;
   background: var(--panel-strong);
@@ -652,6 +682,161 @@ select {
   display: flex;
   min-height: 180px;
   padding: 18px;
+}
+
+.opportunitiesGrid {
+  display: grid;
+  gap: 18px;
+  grid-template-columns: minmax(300px, 420px) minmax(0, 1fr);
+}
+
+.riskNotice {
+  align-items: center;
+  background: #fff7ed;
+  border: 1px solid #fed7aa;
+  border-radius: 8px;
+  color: #9a3412;
+  display: flex;
+  gap: 9px;
+  font-size: 13px;
+  font-weight: 700;
+  margin-bottom: 16px;
+  padding: 10px 12px;
+}
+
+.opportunityForm {
+  display: grid;
+  gap: 13px;
+  grid-template-columns: 1fr 1fr;
+}
+
+.opportunityForm label {
+  color: var(--text);
+}
+
+.opportunityForm input,
+.opportunityForm select {
+  background: var(--panel-strong);
+  border: 1px solid var(--line);
+}
+
+.opportunitySubmit {
+  grid-column: 1 / -1;
+}
+
+.opportunityResults {
+  display: grid;
+  gap: 14px;
+}
+
+.opportunityCard {
+  background: #fbfdff;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 14px;
+}
+
+.opportunityHeader {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  justify-content: space-between;
+  margin-bottom: 14px;
+}
+
+.opportunityHeader > span:last-child {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.directionBadge {
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 900;
+  padding: 6px 10px;
+}
+
+.directionBadge--buy {
+  background: #dcfce7;
+  color: #166534;
+}
+
+.directionBadge--sell {
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+.directionBadge--wait {
+  background: #e0e7ff;
+  color: #3730a3;
+}
+
+.directionBadge--avoid {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.opportunityMetrics {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  margin-bottom: 14px;
+}
+
+.opportunityMetrics div {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  display: grid;
+  gap: 4px;
+  min-height: 70px;
+  padding: 10px;
+}
+
+.opportunityMetrics span {
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.opportunityMetrics strong {
+  color: var(--text);
+  font-size: 15px;
+  overflow-wrap: anywhere;
+}
+
+.reasonGrid {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: 1fr 1fr;
+}
+
+.reasonBlock {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 12px;
+}
+
+.reasonBlock h4 {
+  font-size: 13px;
+  margin: 0 0 8px;
+}
+
+.reasonBlock ul {
+  margin: 0 0 0 18px;
+  padding: 0;
+}
+
+.reasonBlock li,
+.reasonBlock p {
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.45;
+  margin: 6px 0;
 }
 
 .markdownPreview {
@@ -719,7 +904,8 @@ select {
 
 @media (max-width: 1040px) {
   .workspace,
-  .contentGrid {
+  .contentGrid,
+  .opportunitiesGrid {
     grid-template-columns: 1fr;
   }
 
@@ -738,5 +924,11 @@ select {
   .progressTimeline {
     gap: 14px;
     grid-template-columns: repeat(5, minmax(116px, 1fr));
+  }
+
+  .opportunityForm,
+  .opportunityMetrics,
+  .reasonGrid {
+    grid-template-columns: 1fr;
   }
 }
