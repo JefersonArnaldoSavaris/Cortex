@@ -146,6 +146,16 @@ python -m cli.main     # alternativa: executar direto do código-fonte
 
 A tela inicial permite selecionar tickers, data de análise, provedor de LLM, profundidade de pesquisa e outras opções.
 
+### Trading Opportunities
+
+O Cortex também inclui um módulo experimental de análise operacional de curto prazo para sinais técnicos preliminares de Day Trade e Swing Trade. Ele não executa ordens reais e não constitui recomendação financeira.
+
+```bash
+cortex opportunities --symbol SPY --strategy-type daytrade --timeframe M15 --provider mock
+```
+
+Veja a documentação completa em [docs/trading_opportunities.md](docs/trading_opportunities.md).
+
 <p align="center">
   <img src="assets/cli/cli_init.png" width="100%" style="display: inline-block; margin: 0 2%;">
 </p>

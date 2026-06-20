@@ -1,5 +1,6 @@
 from typing import Optional
 import datetime
+import json
 import typer
 from pathlib import Path
 from functools import wraps
@@ -1215,6 +1216,41 @@ def analyze(
         n = clear_all_checkpoints(DEFAULT_CONFIG["data_cache_dir"])
         console.print(f"[yellow]Cleared {n} checkpoint(s).[/yellow]")
     run_analysis(checkpoint=checkpoint)
+
+
+@app.command()
+def opportunities(
+    symbol: str = typer.Option("SPY", "--symbol", "-s", help="Ticker/symbol to analyze."),
+    strategy_type: str = typer.Option("daytrade", "--strategy-type", help="daytrade or swingtrade."),
+    timeframe: str = typer.Option("M15", "--timeframe", help="M1, M5, M15, M30, H1, H4 or D1."),
+    risk_profile: str = typer.Option("moderado", "--risk-profile", help="conservador, moderado or agressivo."),
+    capital: float = typer.Option(10_000.0, "--capital", help="Estimated capital for sizing simulation."),
+    max_risk_per_trade: float = typer.Option(0.01, "--max-risk-per-trade", help="Maximum risk per trade as a decimal."),
+    max_signals: int = typer.Option(1, "--max-signals", help="Maximum number of signals to return."),
+    provider: str = typer.Option("mock", "--provider", help="mock, yfinance or mt5."),
+    limit: int = typer.Option(160, "--limit", help="Number of OHLCV bars to evaluate."),
+    no_audit_log: bool = typer.Option(False, "--no-audit-log", help="Do not append the opportunity audit log."),
+):
+    """Generate educational short-term trading opportunity signals.
+
+    This command never places real orders. MT5 is present only as a safe stub.
+    """
+    from cortex.trading_opportunities import OpportunityRequest, TradingOpportunityAgent
+
+    request = OpportunityRequest(
+        symbol=symbol,
+        strategy_type=strategy_type,
+        timeframe=timeframe,
+        risk_profile=risk_profile,
+        capital=capital,
+        max_risk_per_trade=max_risk_per_trade,
+        max_signals=max_signals,
+        provider=provider,
+        limit=limit,
+    )
+    agent = TradingOpportunityAgent(log_path=None) if no_audit_log else TradingOpportunityAgent()
+    result = agent.analyze(request)
+    console.print_json(json.dumps(result.model_dump(mode="json"), ensure_ascii=False))
 
 
 if __name__ == "__main__":
