@@ -66,12 +66,20 @@ class OpportunityRequest(BaseModel):
     @field_validator("symbol")
     @classmethod
     def normalize_symbol(cls, value: str) -> str:
-        return value.strip().upper()
+        return value.strip()
 
     @field_validator("provider")
     @classmethod
     def normalize_provider(cls, value: str) -> str:
         return value.strip().lower()
+
+    @model_validator(mode="after")
+    def normalize_symbol_for_provider(self) -> "OpportunityRequest":
+        # Broker suffixes can be case-sensitive (for example Exness uses
+        # symbols such as ENJUSDm). Preserve the exact MT5 catalog value.
+        if self.provider != "mt5":
+            self.symbol = self.symbol.upper()
+        return self
 
 
 class TechnicalSnapshot(BaseModel):

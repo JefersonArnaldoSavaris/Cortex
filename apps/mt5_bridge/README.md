@@ -47,6 +47,6 @@ Depois reinicie a API Cortex.
 - `GET /status`
 - `GET /ohlcv?symbol=WIN$N&timeframe=M15&limit=160`
 - `GET /price?symbol=WIN$N`
+- `GET /symbols?query=EUR&limit=500`
 
 O serviço é somente leitura. Não há endpoint de ordem.
-

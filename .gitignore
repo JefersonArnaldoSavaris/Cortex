@@ -227,6 +227,7 @@ downloads/
 
 # Web app
 apps/web/.next/
+apps/web/.next.*/
 apps/web/node_modules/
 apps/web/out/
 apps/web/.env.local

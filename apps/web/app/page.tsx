@@ -10,7 +10,7 @@ import {
   Play,
   RefreshCw,
 } from "lucide-react";
-import { CandlestickSeries, ColorType, UTCTimestamp, createChart } from "lightweight-charts";
+import { CandlestickSeries, ColorType, type ISeriesApi, UTCTimestamp, createChart } from "lightweight-charts";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 
@@ -71,6 +71,18 @@ type PricePoint = {
   volume?: number | null;
 };
 
+type MarketTick = {
+  type: "tick";
+  symbol: string;
+  timestamp: number;
+  bid: number;
+  ask: number;
+  last: number;
+  volume: number;
+};
+
+type StreamStatus = "offline" | "connecting" | "live" | "reconnecting" | "error";
+
 type AssetHistoryResponse = {
   symbol: string;
   name: string;
@@ -108,6 +120,16 @@ type MT5ConnectForm = {
   password: string;
   server: string;
   terminal_path: string;
+};
+
+type MT5SymbolResponse = {
+  symbols: Array<{
+    symbol: string;
+    name: string;
+    category: string;
+    path?: string | null;
+    visible: boolean;
+  }>;
 };
 
 const API_URL = process.env.NEXT_PUBLIC_CORTEX_API_URL ?? "http://localhost:8000";
@@ -307,28 +329,42 @@ function CandleChart({
   interval,
   period,
   opportunity,
+  liveCandle,
+  streamStatus,
 }: {
   points: PricePoint[];
   interval: string;
   period: string;
   opportunity?: OpportunitySignal | null;
+  liveCandle?: PricePoint | null;
+  streamStatus: StreamStatus;
 }) {
   const containerRef = useRef<HTMLDivElement | null>(null);
+  const seriesRef = useRef<ISeriesApi<"Candlestick"> | null>(null);
+  const pointsRef = useRef(points);
+  pointsRef.current = points;
+
+  const displayPoints = useMemo(() => {
+    if (!liveCandle) return points;
+    const liveTime = new Date(liveCandle.date).getTime();
+    const withoutCurrent = points.filter((point) => new Date(point.date).getTime() !== liveTime);
+    return [...withoutCurrent, liveCandle].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+  }, [liveCandle, points]);
 
   const stats = useMemo(() => {
-    if (points.length < 2) return null;
-    const first = points[0];
-    const last = points[points.length - 1];
-    const closes = points.map((point) => point.close);
+    if (displayPoints.length < 2) return null;
+    const first = displayPoints[0];
+    const last = displayPoints[displayPoints.length - 1];
+    const closes = displayPoints.map((point) => point.close);
     const min = Math.min(...closes);
     const max = Math.max(...closes);
     const change = last.close - first.close;
     const changePct = (change / first.close) * 100;
     return { first, last, min, max, change, changePct };
-  }, [points]);
+  }, [displayPoints]);
 
   useEffect(() => {
-    if (!containerRef.current || points.length < 2) return;
+    if (!containerRef.current) return;
 
     const chart = createChart(containerRef.current, {
       autoSize: true,
@@ -363,16 +399,16 @@ function CandleChart({
       wickUpColor: "#22c55e",
       wickDownColor: "#ef4444",
     });
-
-    series.setData(
-      points.map((point) => ({
+    seriesRef.current = series;
+    if (pointsRef.current.length > 0) {
+      series.setData(pointsRef.current.map((point) => ({
         time: Math.floor(new Date(point.date).getTime() / 1000) as UTCTimestamp,
         open: point.open,
         high: point.high,
         low: point.low,
         close: point.close,
-      })),
-    );
+      })));
+    }
 
     if (opportunity?.entry_price) {
       series.createPriceLine({
@@ -406,8 +442,33 @@ function CandleChart({
     }
     chart.timeScale().fitContent();
 
-    return () => chart.remove();
-  }, [interval, opportunity?.entry_price, opportunity?.stop_loss, opportunity?.take_profit, points]);
+    return () => {
+      seriesRef.current = null;
+      chart.remove();
+    };
+  }, [interval, opportunity?.entry_price, opportunity?.stop_loss, opportunity?.take_profit]);
+
+  useEffect(() => {
+    if (!seriesRef.current || points.length === 0) return;
+    seriesRef.current.setData(points.map((point) => ({
+      time: Math.floor(new Date(point.date).getTime() / 1000) as UTCTimestamp,
+      open: point.open,
+      high: point.high,
+      low: point.low,
+      close: point.close,
+    })));
+  }, [points]);
+
+  useEffect(() => {
+    if (!seriesRef.current || !liveCandle) return;
+    seriesRef.current.update({
+      time: Math.floor(new Date(liveCandle.date).getTime() / 1000) as UTCTimestamp,
+      open: liveCandle.open,
+      high: liveCandle.high,
+      low: liveCandle.low,
+      close: liveCandle.close,
+    });
+  }, [liveCandle]);
 
   if (!stats) {
     return <div className="chartEmpty">Sem dados suficientes para plotar o gráfico.</div>;
@@ -416,6 +477,9 @@ function CandleChart({
   return (
     <div className="chartBox">
       <div className="chartStats">
+        <span className={`liveStreamBadge liveStreamBadge--${streamStatus}`}>
+          <i /> {streamStatus === "live" ? "Tempo real" : streamStatus === "connecting" ? "Conectando" : streamStatus === "reconnecting" ? "Reconectando" : streamStatus === "error" ? "Stream indisponível" : "Snapshot"}
+        </span>
         <span>
           Último <strong>{formatPrice(stats.last.close)}</strong>
         </span>
@@ -466,6 +530,8 @@ export default function Dashboard() {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [report, setReport] = useState("");
   const [history, setHistory] = useState<PricePoint[]>([]);
+  const [liveCandle, setLiveCandle] = useState<PricePoint | null>(null);
+  const [streamStatus, setStreamStatus] = useState<StreamStatus>("offline");
   const [activeView, setActiveView] = useState<ViewKey>("dashboard");
   const [chartInterval, setChartInterval] = useState("1d");
   const [chartPeriod, setChartPeriod] = useState("6mo");
@@ -477,6 +543,7 @@ export default function Dashboard() {
   const [opportunityResult, setOpportunityResult] = useState<OpportunityResult | null>(null);
   const [marketDataProvider, setMarketDataProvider] = useState<"yfinance" | "mt5">("yfinance");
   const [mt5Status, setMt5Status] = useState<MT5StatusResponse>({ connected: false });
+  const [mt5Assets, setMt5Assets] = useState<AssetOption[]>([]);
   const [mt5Form, setMt5Form] = useState<MT5ConnectForm>({ login: "", password: "", server: "", terminal_path: "" });
   const [mt5Error, setMt5Error] = useState<string | null>(null);
   const [isMt5Loading, setIsMt5Loading] = useState(false);
@@ -610,9 +677,12 @@ export default function Dashboard() {
   const selectedAnalysis =
     completedAnalyses.find((analysis) => analysis.id === selectedId) ?? completedAnalyses[0] ?? null;
   const chartSymbol = activeView === "oportunidades-micro"
-    ? (opportunityForm.symbol.trim().toUpperCase() || "SPY")
+    ? (marketDataProvider === "mt5"
+        ? (opportunityForm.symbol.trim() || "SPY")
+        : (opportunityForm.symbol.trim().toUpperCase() || "SPY"))
     : form.ticker;
-  const selectedAsset = options?.assets.find((asset) => asset.symbol === chartSymbol);
+  const opportunityAssets = marketDataProvider === "mt5" && mt5Assets.length > 0 ? mt5Assets : (options?.assets ?? []);
+  const selectedAsset = [...(options?.assets ?? []), ...mt5Assets].find((asset) => asset.symbol === chartSymbol);
   const opportunitySignal = opportunityResult?.signals[0] ?? null;
   const periodOptions = periodOptionsByInterval[chartInterval] ?? periodOptionsByInterval["1d"];
   const activeChartPeriod = periodOptions.some((period) => period.value === chartPeriod)
@@ -681,9 +751,11 @@ export default function Dashboard() {
         setUser(null);
         throw new Error("Sessão expirada. Entre novamente.");
       }
-      if (!response.ok) throw new Error("Não foi possível carregar o gráfico.");
+      if (!response.ok) throw new Error(await readApiError(response, "Não foi possível carregar o gráfico."));
       const data = (await response.json()) as AssetHistoryResponse;
       setHistory(data.points);
+      setLiveCandle(null);
+      setError(null);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Erro inesperado ao carregar gráfico.");
       setHistory([]);
@@ -701,7 +773,34 @@ export default function Dashboard() {
     if (!response.ok) throw new Error(await readApiError(response, "Não foi possível consultar o MT5."));
     const data = (await response.json()) as MT5StatusResponse;
     setMt5Status(data);
-    if (!data.connected) setMarketDataProvider("yfinance");
+    if (data.connected) {
+      setMarketDataProvider("mt5");
+      setOpportunityForm((current) => ({ ...current, provider: "mt5" }));
+      await loadMt5Symbols();
+    } else {
+      setMarketDataProvider("yfinance");
+      setMt5Assets([]);
+    }
+  }
+
+  async function loadMt5Symbols() {
+    const response = await fetch(`${API_URL}/integrations/mt5/symbols?limit=1000`, { credentials: "include" });
+    if (!response.ok) throw new Error(await readApiError(response, "Não foi possível carregar os ativos da corretora."));
+    const data = (await response.json()) as MT5SymbolResponse;
+    const assets = data.symbols.map((item) => ({
+      symbol: item.symbol,
+      name: item.name || item.symbol,
+      category: item.category || "Corretora",
+      default_provider_symbol: item.symbol,
+    }));
+    setMt5Assets(assets);
+    if (assets.length > 0) {
+      setOpportunityForm((current) => ({
+        ...current,
+        symbol: assets.some((asset) => asset.symbol === current.symbol) ? current.symbol : assets[0].symbol,
+        provider: "mt5",
+      }));
+    }
   }
 
   useEffect(() => {
@@ -726,6 +825,69 @@ export default function Dashboard() {
     }, 350);
     return () => window.clearTimeout(timer);
   }, [activeChartPeriod, chartInterval, chartPeriod, chartSymbol, marketDataProvider, user]);
+
+  useEffect(() => {
+    if (!user || marketDataProvider !== "mt5" || !mt5Status.connected || !chartSymbol) {
+      setStreamStatus("offline");
+      setLiveCandle(null);
+      return;
+    }
+
+    let socket: WebSocket | null = null;
+    let reconnectTimer: number | null = null;
+    let cancelled = false;
+
+    const connect = () => {
+      if (cancelled) return;
+      setStreamStatus((current) => current === "offline" ? "connecting" : "reconnecting");
+      const wsBase = API_URL.replace(/^http/, "ws");
+      socket = new WebSocket(`${wsBase}/ws/market-data?symbol=${encodeURIComponent(chartSymbol)}`);
+      socket.onopen = () => setStreamStatus("live");
+      socket.onmessage = (event) => {
+        const message = JSON.parse(event.data) as MarketTick | { type: "heartbeat" | "error"; message?: string };
+        if (message.type !== "tick") {
+          if (message.type === "error") setStreamStatus("error");
+          return;
+        }
+        const price = message.last || message.bid || message.ask;
+        if (!price) return;
+        const bucketMs = chartInterval === "1m" ? 60_000
+          : chartInterval === "5m" ? 300_000
+          : chartInterval === "15m" ? 900_000
+          : chartInterval === "1h" ? 3_600_000
+          : chartInterval === "4h" ? 14_400_000
+          : 86_400_000;
+        const bucketTime = Math.floor(message.timestamp / bucketMs) * bucketMs;
+        setLiveCandle((current) => {
+          const currentTime = current ? new Date(current.date).getTime() : -1;
+          const historyLast = history[history.length - 1];
+          const historyTime = historyLast ? Math.floor(new Date(historyLast.date).getTime() / bucketMs) * bucketMs : -1;
+          const base = currentTime === bucketTime ? current : historyTime === bucketTime ? historyLast : null;
+          return {
+            date: new Date(bucketTime).toISOString(),
+            open: base?.open ?? price,
+            high: Math.max(base?.high ?? price, price),
+            low: Math.min(base?.low ?? price, price),
+            close: price,
+            volume: (base?.volume ?? 0) + (message.volume > 0 ? message.volume : 1),
+          };
+        });
+      };
+      socket.onerror = () => setStreamStatus("error");
+      socket.onclose = () => {
+        if (cancelled) return;
+        setStreamStatus("reconnecting");
+        reconnectTimer = window.setTimeout(connect, 2000);
+      };
+    };
+
+    connect();
+    return () => {
+      cancelled = true;
+      if (reconnectTimer !== null) window.clearTimeout(reconnectTimer);
+      socket?.close();
+    };
+  }, [chartInterval, chartSymbol, history, marketDataProvider, mt5Status.connected, user]);
 
   useEffect(() => {
     if (activeView !== "oportunidades-micro") return;
@@ -841,6 +1003,7 @@ export default function Dashboard() {
       setMarketDataProvider("mt5");
       setOpportunityForm((current) => ({ ...current, provider: "mt5" }));
       setMt5Form((current) => ({ ...current, password: "" }));
+      await loadMt5Symbols();
     } catch (err) {
       setMt5Error(err instanceof Error ? err.message : "Erro inesperado ao conectar MT5.");
     } finally {
@@ -857,6 +1020,7 @@ export default function Dashboard() {
       const data = (await response.json()) as MT5StatusResponse;
       setMt5Status(data);
       setMarketDataProvider("yfinance");
+      setMt5Assets([]);
       setOpportunityForm((current) => ({ ...current, provider: "mock" }));
     } catch (err) {
       setMt5Error(err instanceof Error ? err.message : "Erro inesperado ao desconectar MT5.");
@@ -1068,7 +1232,14 @@ export default function Dashboard() {
             {isChartLoading ? (
               <LoadingState message="Carregando gráfico de mercado..." />
             ) : (
-              <CandleChart points={history} interval={chartInterval} period={activeChartPeriod} opportunity={opportunitySignal} />
+              <CandleChart
+                points={history}
+                interval={chartInterval}
+                period={activeChartPeriod}
+                opportunity={opportunitySignal}
+                liveCandle={liveCandle}
+                streamStatus={streamStatus}
+              />
             )}
           </section>
   );
@@ -1103,7 +1274,7 @@ export default function Dashboard() {
         />
       ) : activeView === "oportunidades-micro" ? (
         <OpportunityWorkspace
-          assets={options?.assets ?? [
+          assets={opportunityAssets.length > 0 ? opportunityAssets : [
             { symbol: "SPY", name: "SPDR S&P 500 ETF", category: "ETF", default_provider_symbol: "SPY" },
           ]}
           chartSlot={marketPanel}

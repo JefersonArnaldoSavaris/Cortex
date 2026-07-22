@@ -1,6 +1,9 @@
 from __future__ import annotations
 
-from fastapi import Depends, FastAPI, HTTPException, Request, Response
+import asyncio
+import time
+
+from fastapi import Depends, FastAPI, HTTPException, Query, Request, Response, WebSocket, WebSocketDisconnect, status
 from fastapi.middleware.cors import CORSMiddleware
 from cortex.trading_opportunities import OpportunityRequest, TradingOpportunityAgent
 from cortex.trading_opportunities.schemas import OpportunityAnalysisResult
@@ -8,9 +11,11 @@ from cortex.trading_opportunities.schemas import OpportunityAnalysisResult
 from .repository import init_db
 from .auth import (
     authenticate_user,
+    AUTH_COOKIE_NAME,
     clear_auth_cookie,
     enforce_auth_rate_limit,
     get_current_user,
+    get_user_from_token,
     register_user,
     request_password_reset,
     set_auth_cookie,
@@ -30,6 +35,7 @@ from .models import (
     MessageResponse,
     MT5ConnectRequest,
     MT5StatusResponse,
+    MT5SymbolsResponse,
     RegisterRequest,
 )
 from .service import analysis_service, get_asset_history, get_assets
@@ -115,9 +121,12 @@ def asset_history(
     symbol: str,
     period: str = "6mo",
     interval: str = "1d",
+    provider: str = "yfinance",
     current_user: AuthUser = Depends(get_current_user),
 ) -> AssetHistoryResponse:
     try:
+        if provider == "mt5":
+            return get_asset_history(symbol, period, interval, mt5_provider=mt5_sessions.get_provider(current_user))
         return get_asset_history(symbol, period, interval)
     except ValueError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
@@ -186,3 +195,54 @@ def mt5_connect(
 @app.post("/integrations/mt5/disconnect", response_model=MT5StatusResponse)
 def mt5_disconnect(current_user: AuthUser = Depends(get_current_user)) -> MT5StatusResponse:
     return mt5_sessions.disconnect(current_user)
+
+
+@app.get("/integrations/mt5/symbols", response_model=MT5SymbolsResponse)
+def mt5_symbols(
+    query: str = "",
+    limit: int = Query(default=500, ge=1, le=5000),
+    current_user: AuthUser = Depends(get_current_user),
+) -> MT5SymbolsResponse:
+    try:
+        return MT5SymbolsResponse(symbols=mt5_sessions.list_symbols(current_user, query=query, limit=limit))
+    except (ConnectionError, RuntimeError, ValueError) as exc:
+        raise HTTPException(status_code=502, detail=str(exc)) from exc
+
+
+@app.websocket("/ws/market-data")
+async def market_data_stream(websocket: WebSocket, symbol: str) -> None:
+    token = websocket.cookies.get(AUTH_COOKIE_NAME)
+    if not token:
+        await websocket.close(code=status.WS_1008_POLICY_VIOLATION, reason="Autenticação necessária.")
+        return
+    try:
+        user = get_user_from_token(token)
+        mt5_sessions.get_provider(user)
+    except HTTPException:
+        await websocket.close(code=status.WS_1008_POLICY_VIOLATION, reason="Sessão inválida.")
+        return
+    except ValueError as exc:
+        await websocket.close(code=status.WS_1008_POLICY_VIOLATION, reason=str(exc))
+        return
+
+    await websocket.accept()
+    last_signature: tuple | None = None
+    last_heartbeat = 0.0
+    try:
+        while True:
+            tick = await asyncio.to_thread(mt5_sessions.get_tick, user, symbol)
+            signature = (tick.get("timestamp"), tick.get("bid"), tick.get("ask"), tick.get("last"), tick.get("volume"))
+            now = time.monotonic()
+            if signature != last_signature:
+                await websocket.send_json({"type": "tick", **tick})
+                last_signature = signature
+                last_heartbeat = now
+            elif now - last_heartbeat >= 10:
+                await websocket.send_json({"type": "heartbeat", "timestamp": int(time.time() * 1000)})
+                last_heartbeat = now
+            await asyncio.sleep(0.5)
+    except WebSocketDisconnect:
+        return
+    except Exception as exc:
+        await websocket.send_json({"type": "error", "message": str(exc)})
+        await websocket.close(code=status.WS_1011_INTERNAL_ERROR)

@@ -49,7 +49,8 @@ class MT5MarketDataProvider(MarketDataProvider):
     def get_ohlcv(self, symbol: str, timeframe: Timeframe, limit: int) -> Sequence[OHLCVBar]:
         with self._connected() as mt5:
             if not mt5.symbol_select(symbol, True):
-                raise ValueError(f"Símbolo não disponível no servidor MT5: {symbol}")
+                code, message = mt5.last_error()
+                raise ValueError(f"Símbolo não disponível no servidor MT5: {symbol} ({code}: {message})")
 
             mt5_timeframe = getattr(mt5, MT5_TIMEFRAMES[timeframe])
             rates = mt5.copy_rates_from_pos(symbol, mt5_timeframe, 0, limit)
@@ -71,13 +72,25 @@ class MT5MarketDataProvider(MarketDataProvider):
             return bars
 
     def get_current_price(self, symbol: str) -> float:
+        tick = self.get_market_tick(symbol)
+        return float(tick["last"] or tick["bid"] or tick["ask"])
+
+    def get_market_tick(self, symbol: str) -> dict[str, str | int | float]:
         with self._connected() as mt5:
             if not mt5.symbol_select(symbol, True):
                 raise ValueError(f"Símbolo não disponível no servidor MT5: {symbol}")
             tick = mt5.symbol_info_tick(symbol)
             if tick is None:
                 raise ValueError(f"Preço atual indisponível no MT5 para {symbol}")
-            return float(tick.last or tick.bid or tick.ask)
+            data = tick._asdict()
+            return {
+                "symbol": symbol,
+                "timestamp": int(data.get("time_msc") or int(data.get("time", 0)) * 1000),
+                "bid": float(data.get("bid") or 0),
+                "ask": float(data.get("ask") or 0),
+                "last": float(data.get("last") or data.get("bid") or data.get("ask") or 0),
+                "volume": float(data.get("volume_real") or data.get("volume") or 0),
+            }
 
     def get_account_info(self) -> dict[str, str | int | float | bool | None]:
         with self._connected() as mt5:
@@ -96,6 +109,39 @@ class MT5MarketDataProvider(MarketDataProvider):
                 "margin": data.get("margin"),
                 "trade_allowed": data.get("trade_allowed"),
             }
+
+    def list_symbols(self, query: str = "", limit: int = 500) -> list[dict[str, str | bool | None]]:
+        """Return symbols exposed by the connected broker account."""
+        normalized_query = query.strip().lower()
+        with self._connected() as mt5:
+            symbols = mt5.symbols_get()
+            if symbols is None:
+                code, message = mt5.last_error()
+                raise ConnectionError(f"Falha ao listar símbolos do MT5 ({code}): {message}")
+
+            results: list[dict[str, str | bool | None]] = []
+            for symbol in symbols:
+                data = symbol._asdict()
+                name = str(data.get("name") or "")
+                description = str(data.get("description") or name)
+                path = str(data.get("path") or "")
+                haystack = f"{name} {description} {path}".lower()
+                if normalized_query and normalized_query not in haystack:
+                    continue
+                results.append(
+                    {
+                        "symbol": name,
+                        "name": description,
+                        "category": path.split("\\")[0] if path else "Corretora",
+                        "path": path or None,
+                        "currency_base": data.get("currency_base") or None,
+                        "currency_profit": data.get("currency_profit") or None,
+                        "visible": bool(data.get("visible")),
+                    }
+                )
+                if len(results) >= limit:
+                    break
+            return results
 
     @contextmanager
     def _connected(self) -> Iterator[object]:
@@ -133,4 +179,3 @@ class MT5MarketDataProvider(MarketDataProvider):
                 yield mt5
             finally:
                 mt5.shutdown()
-

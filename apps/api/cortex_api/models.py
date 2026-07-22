@@ -110,6 +110,20 @@ class MT5StatusResponse(BaseModel):
     message: str
 
 
+class MT5Symbol(BaseModel):
+    symbol: str
+    name: str
+    category: str = "Corretora"
+    path: str | None = None
+    currency_base: str | None = None
+    currency_profit: str | None = None
+    visible: bool = False
+
+
+class MT5SymbolsResponse(BaseModel):
+    symbols: list[MT5Symbol]
+
+
 class AnalysisRequest(BaseModel):
     ticker: str = Field(default="SPY", min_length=1, max_length=32, examples=["SPY"])
     analysis_date: str = Field(

@@ -23,7 +23,16 @@ def _normalize_sqlite_url(database_url: str) -> str:
     return f"{prefix}{absolute_path}"
 
 
-DATABASE_URL = _normalize_sqlite_url(
+def _normalize_database_url(database_url: str) -> str:
+    normalized = _normalize_sqlite_url(database_url)
+    if normalized.startswith("postgres://"):
+        return normalized.replace("postgres://", "postgresql+psycopg://", 1)
+    if normalized.startswith("postgresql://"):
+        return normalized.replace("postgresql://", "postgresql+psycopg://", 1)
+    return normalized
+
+
+DATABASE_URL = _normalize_database_url(
     os.getenv("CORTEX_DATABASE_URL")
     or os.getenv("DATABASE_URL")
     or "sqlite:///./cortex_app.db"
@@ -32,6 +41,16 @@ DATABASE_URL = _normalize_sqlite_url(
 ENGINE_KWARGS = {"future": True}
 if DATABASE_URL.startswith("sqlite"):
     ENGINE_KWARGS["connect_args"] = {"check_same_thread": False}
+else:
+    ENGINE_KWARGS.update(
+        {
+            "pool_pre_ping": True,
+            "pool_size": int(os.getenv("CORTEX_DB_POOL_SIZE", "5")),
+            "max_overflow": int(os.getenv("CORTEX_DB_MAX_OVERFLOW", "5")),
+            "pool_recycle": int(os.getenv("CORTEX_DB_POOL_RECYCLE_SECONDS", "300")),
+            "connect_args": {"prepare_threshold": None},
+        }
+    )
 
 engine = create_engine(DATABASE_URL, **ENGINE_KWARGS)
 SessionLocal = sessionmaker(bind=engine, autoflush=False, autocommit=False, expire_on_commit=False, class_=Session)

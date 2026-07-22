@@ -28,6 +28,10 @@ class MT5BridgeMarketDataProvider(MarketDataProvider):
     def status(self) -> dict:
         return self._request("GET", "/status")
 
+    def list_symbols(self, query: str = "", limit: int = 500) -> list[dict]:
+        body = self._request("GET", "/symbols", params={"query": query, "limit": limit})
+        return list(body.get("symbols", []))
+
     def get_ohlcv(self, symbol: str, timeframe: Timeframe, limit: int) -> Sequence[OHLCVBar]:
         body = self._request(
             "GET",
@@ -50,6 +54,9 @@ class MT5BridgeMarketDataProvider(MarketDataProvider):
         body = self._request("GET", "/price", params={"symbol": symbol})
         return float(body["price"])
 
+    def get_market_tick(self, symbol: str) -> dict:
+        return self._request("GET", "/tick", params={"symbol": symbol})
+
     def _request(self, method: str, path: str, **kwargs) -> dict:
         try:
             response = requests.request(method, f"{self.base_url}{path}", timeout=self.timeout, **kwargs)
@@ -60,4 +67,3 @@ class MT5BridgeMarketDataProvider(MarketDataProvider):
             detail = response.json().get("detail") if response.headers.get("content-type", "").startswith("application/json") else response.text
             raise ValueError(str(detail or "Erro ao consultar MT5 bridge."))
         return response.json()
-

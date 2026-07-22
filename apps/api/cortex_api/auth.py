@@ -206,6 +206,10 @@ def get_current_user(
     token = cookie_token or _extract_bearer_token(authorization)
     if not token:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Autenticação necessária.")
+    return get_user_from_token(token)
+
+
+def get_user_from_token(token: str) -> AuthUser:
     payload = decode_access_token(token)
     user_id = str(payload.get("sub") or "")
     with session_scope() as session:
@@ -218,4 +222,3 @@ def get_current_user(
 
 
 CurrentUser = Depends(get_current_user)
-

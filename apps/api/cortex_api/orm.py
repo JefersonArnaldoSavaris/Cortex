@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from datetime import datetime
 
-from sqlalchemy import DateTime, ForeignKey, Integer, Text
+from sqlalchemy import Boolean, DateTime, Float, ForeignKey, Integer, Text
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
 
@@ -23,6 +23,38 @@ class UserORM(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, default=datetime.now)
     updated_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, default=datetime.now)
     last_login_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+
+    broker_connections: Mapped[list["BrokerConnectionORM"]] = relationship(
+        back_populates="user",
+        cascade="all, delete-orphan",
+    )
+
+
+class BrokerConnectionORM(Base):
+    __tablename__ = "broker_connections"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    user_id: Mapped[str] = mapped_column(Text, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, unique=True, index=True)
+    provider: Mapped[str] = mapped_column(Text, nullable=False, default="mt5")
+    login: Mapped[int] = mapped_column(Integer, nullable=False)
+    server: Mapped[str] = mapped_column(Text, nullable=False)
+    encrypted_password: Mapped[str] = mapped_column(Text, nullable=False)
+    terminal_path: Mapped[str | None] = mapped_column(Text, nullable=True)
+    active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    connection_status: Mapped[str] = mapped_column(Text, nullable=False, default="connected")
+    account_name: Mapped[str | None] = mapped_column(Text, nullable=True)
+    company: Mapped[str | None] = mapped_column(Text, nullable=True)
+    currency: Mapped[str | None] = mapped_column(Text, nullable=True)
+    balance: Mapped[float | None] = mapped_column(Float, nullable=True)
+    equity: Mapped[float | None] = mapped_column(Float, nullable=True)
+    margin: Mapped[float | None] = mapped_column(Float, nullable=True)
+    trade_allowed: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
+    last_connected_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    last_error: Mapped[str | None] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, default=datetime.now)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, default=datetime.now)
+
+    user: Mapped[UserORM] = relationship(back_populates="broker_connections")
 
 
 class AnalysisORM(Base):

@@ -20,6 +20,10 @@ class OHLCVResponse(BaseModel):
     bars: list[dict]
 
 
+class SymbolsResponse(BaseModel):
+    symbols: list[dict]
+
+
 app = FastAPI(
     title="Cortex MT5 Bridge",
     version="0.1.0",
@@ -127,3 +131,19 @@ def price(symbol: str) -> dict[str, float]:
         raise HTTPException(status_code=502, detail=str(exc)) from exc
     return {"price": value}
 
+
+@app.get("/tick")
+def tick(symbol: str) -> dict:
+    try:
+        return _active_provider().get_market_tick(symbol)
+    except Exception as exc:
+        raise HTTPException(status_code=502, detail=str(exc)) from exc
+
+
+@app.get("/symbols", response_model=SymbolsResponse)
+def symbols(query: str = "", limit: int = Query(default=500, ge=1, le=5000)) -> SymbolsResponse:
+    try:
+        items = _active_provider().list_symbols(query=query, limit=limit)
+    except Exception as exc:
+        raise HTTPException(status_code=502, detail=str(exc)) from exc
+    return SymbolsResponse(symbols=items)

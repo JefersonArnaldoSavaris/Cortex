@@ -253,7 +253,46 @@ def _format_history_timestamp(index: pd.Timestamp, interval: str) -> str:
     return index.strftime("%Y-%m-%dT%H:%M:%S")
 
 
-def get_asset_history(symbol: str, period: str = "6mo", interval: str = "1d") -> AssetHistoryResponse:
+def get_asset_history(
+    symbol: str,
+    period: str = "6mo",
+    interval: str = "1d",
+    mt5_provider=None,
+) -> AssetHistoryResponse:
+    if mt5_provider is not None:
+        from cortex.trading_opportunities.schemas import Timeframe
+
+        normalized_period, normalized_interval = _validate_history_request(period, interval)
+        timeframe = {
+            "1m": Timeframe.M1,
+            "5m": Timeframe.M5,
+            "15m": Timeframe.M15,
+            "1h": Timeframe.H1,
+            "4h": Timeframe.H4,
+            "1d": Timeframe.D1,
+        }[normalized_interval]
+        period_days = {"1d": 1, "5d": 5, "1mo": 31, "3mo": 93, "6mo": 186, "1y": 366}[normalized_period]
+        bars_per_day = {"1m": 1440, "5m": 288, "15m": 96, "1h": 24, "4h": 6, "1d": 1}[normalized_interval]
+        limit = min(max(period_days * bars_per_day, 50), 5000)
+        bars = mt5_provider.get_ohlcv(symbol, timeframe, limit)
+        return AssetHistoryResponse(
+            symbol=symbol,
+            name=symbol,
+            period=normalized_period,
+            interval=normalized_interval,
+            points=[
+                PricePoint(
+                    date=bar.timestamp.isoformat(),
+                    open=bar.open,
+                    high=bar.high,
+                    low=bar.low,
+                    close=bar.close,
+                    volume=bar.volume,
+                )
+                for bar in bars
+            ],
+        )
+
     import yfinance as yf
 
     asset = next((item for item in ASSET_OPTIONS if item.symbol == symbol.upper()), None)

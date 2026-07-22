@@ -1629,7 +1629,7 @@ label,
 
 .terminalShell {
   display: grid;
-  grid-template-columns: 300px minmax(0, 1fr);
+  grid-template-columns: 260px minmax(0, 1fr);
   min-height: 100vh;
 }
 
@@ -1643,7 +1643,9 @@ label,
   grid-gap: 20px;
   gap: 20px;
   min-height: 100vh;
-  padding: 22px;
+  height: 100vh;
+  overflow-y: auto;
+  padding: 20px 16px;
   position: -webkit-sticky;
   position: sticky;
   top: 0;
@@ -1909,7 +1911,7 @@ label,
 
 .terminalMain {
   min-width: 0;
-  padding: 20px 22px 28px;
+  padding: 18px clamp(16px, 1.7vw, 30px) 30px;
 }
 
 .terminalTopbar {
@@ -1919,6 +1921,13 @@ label,
   gap: 16px;
   grid-template-columns: minmax(280px, 1fr) auto;
   margin-bottom: 18px;
+  position: sticky;
+  top: 0;
+  z-index: 30;
+  background: rgba(7, 11, 18, 0.94);
+  backdrop-filter: blur(14px);
+  border-bottom: 1px solid rgba(148, 163, 184, 0.1);
+  padding: 8px 0 10px;
 }
 
 .globalSearch {
@@ -1950,7 +1959,9 @@ label,
 .topbarCluster {
   align-items: center;
   display: flex;
+  flex-wrap: wrap;
   gap: 9px;
+  justify-content: flex-end;
 }
 
 .marketStatus,
@@ -2088,7 +2099,7 @@ label,
   grid-gap: 12px;
   gap: 12px;
   grid-column: span 12;
-  grid-template-columns: repeat(6, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
 }
 
 .statCard {
@@ -2263,6 +2274,45 @@ label,
 
 .chartStats strong {
   color: var(--text);
+}
+
+.liveStreamBadge {
+  align-items: center;
+  background: rgba(148, 163, 184, 0.1);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  display: inline-flex;
+  font-size: 11px;
+  font-weight: 900;
+  padding: 3px 8px;
+}
+
+.liveStreamBadge i {
+  background: var(--muted);
+  border-radius: 999px;
+  height: 7px;
+  width: 7px;
+}
+
+.liveStreamBadge--live {
+  background: var(--success-soft);
+  border-color: rgba(34, 197, 94, 0.35);
+  color: #86efac;
+}
+
+.liveStreamBadge--live i {
+  animation: pulse 1.2s ease-in-out infinite;
+  background: var(--success);
+  box-shadow: 0 0 10px rgba(34, 197, 94, 0.7);
+}
+
+.liveStreamBadge--connecting,
+.liveStreamBadge--reconnecting {
+  color: #fbbf24;
+}
+
+.liveStreamBadge--error {
+  color: #fca5a5;
 }
 
 .positive {
@@ -2495,8 +2545,8 @@ label,
 
 .opportunityWorkspace {
   display: grid;
-  grid-gap: 16px;
-  gap: 16px;
+  grid-gap: 14px;
+  gap: 14px;
 }
 
 .opportunityHero {
@@ -2510,7 +2560,7 @@ label,
   display: flex;
   gap: 18px;
   justify-content: space-between;
-  padding: 20px;
+  padding: 16px 18px;
 }
 
 .opportunityHeroTitle {
@@ -2521,7 +2571,7 @@ label,
 }
 
 .opportunityHero h3 {
-  font-size: 30px;
+  font-size: clamp(24px, 2.2vw, 30px);
   line-height: 1.05;
   margin: 0;
 }
@@ -2547,11 +2597,12 @@ label,
 }
 
 .opportunityHeroStatus {
-  align-items: flex-end;
-  display: grid;
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
   grid-gap: 8px;
   gap: 8px;
-  justify-items: end;
+  justify-content: flex-end;
   min-width: 220px;
 }
 
@@ -2577,24 +2628,50 @@ label,
   display: grid;
   grid-gap: 16px;
   gap: 16px;
-  grid-template-columns: minmax(300px, 360px) minmax(0, 1fr);
+}
+
+.opportunityShell--horizontal {
+  grid-template-columns: minmax(0, 1fr);
 }
 
 .tradingConfigPanel {
-  align-self: start;
+  align-self: stretch;
   background:
     linear-gradient(180deg, rgba(34, 211, 238, 0.06), transparent),
     rgba(8, 15, 26, 0.96);
-  padding: 16px;
-  position: -webkit-sticky;
-  position: sticky;
-  top: 20px;
+  padding: 15px 16px 16px;
+  position: static;
 }
 
 .tradingConfigForm {
   display: grid;
-  grid-gap: 12px;
-  gap: 12px;
+  grid-gap: 12px 14px;
+  gap: 12px 14px;
+  grid-template-columns: repeat(4, minmax(140px, 1fr));
+  align-items: end;
+}
+
+.tradingConfigPanel .panelHeader {
+  margin-bottom: 12px;
+}
+
+.configField--asset {
+  grid-column: span 2;
+}
+
+.tradingConfigForm .configSplit {
+  display: contents;
+}
+
+.configField--provider small {
+  display: block;
+  line-height: 1.3;
+  margin-top: 6px;
+}
+
+.tradingConfigSubmit {
+  grid-column: span 2;
+  min-height: 42px;
 }
 
 .configSplit {
@@ -2610,6 +2687,47 @@ label,
   gap: 16px;
 }
 
+.opportunityChartStage {
+  min-width: 0;
+}
+
+.opportunityChartStage .chartPanel {
+  padding: 16px;
+}
+
+.opportunityChartStage .priceChart {
+  height: clamp(340px, 42vh, 520px);
+}
+
+.opportunityAnalysisStage {
+  display: grid;
+  gap: 16px;
+  grid-template-columns: minmax(360px, 0.8fr) minmax(0, 1.2fr);
+  min-width: 0;
+}
+
+.opportunityStageHeader {
+  align-items: center;
+  color: var(--primary);
+  display: flex;
+  gap: 10px;
+  grid-column: 1 / -1;
+  padding: 0 2px;
+}
+
+.opportunityStageHeader h4 {
+  color: var(--text);
+  font-size: 16px;
+  margin: 0;
+}
+
+.opportunityStageHeader span {
+  color: var(--muted);
+  display: block;
+  font-size: 12px;
+  margin-top: 3px;
+}
+
 .opportunityCoreGrid {
   display: grid;
   grid-gap: 16px;
@@ -2621,7 +2739,7 @@ label,
   display: grid;
   grid-gap: 16px;
   gap: 16px;
-  min-height: 390px;
+  min-height: 330px;
   overflow: hidden;
   padding: 16px;
   position: relative;
@@ -2934,8 +3052,20 @@ label,
   display: grid;
   grid-gap: 12px;
   gap: 12px;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   padding: 16px;
+}
+
+.contextPanel .opsStatusCard {
+  grid-column: span 2;
+}
+
+.contextPanel .opsStatusRows {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.contextPanel .opsStatusRows span {
+  align-content: start;
 }
 
 .analysisReasonList,
@@ -3392,9 +3522,27 @@ label,
 
   .opportunityShell,
   .opportunityCoreGrid,
+  .opportunityAnalysisStage,
   .brokerIntegrationGrid,
   .contextPanel {
     grid-template-columns: 1fr;
+  }
+
+  .tradingConfigForm {
+    grid-template-columns: repeat(2, minmax(140px, 1fr));
+  }
+
+  .configField--asset,
+  .tradingConfigSubmit {
+    grid-column: span 2;
+  }
+
+  .contextPanel .opsStatusCard {
+    grid-column: auto;
+  }
+
+  .contextPanel .opsStatusRows {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 
   .tradingConfigPanel {
@@ -3463,8 +3611,23 @@ label,
   }
 
   .terminalSidebar {
+    height: auto;
     min-height: auto;
     position: static;
+  }
+
+  .terminalMain {
+    padding: 14px;
+  }
+
+  .tradingConfigForm,
+  .contextPanel .opsStatusRows {
+    grid-template-columns: 1fr;
+  }
+
+  .configField--asset,
+  .tradingConfigSubmit {
+    grid-column: auto;
   }
 
   .sidebarControlPanel {

@@ -80,20 +80,23 @@ export function OpportunityWorkspace({
     <section className="opportunityWorkspace">
       <OpportunityHeader provider={form.provider} isMt5Selected={isMt5Selected} />
 
-      <div className="opportunityShell">
+      <div className="opportunityShell opportunityShell--horizontal">
         <TradingConfigPanel assets={assets} form={form} setForm={setForm} isLoading={isLoading} onSubmit={onSubmit} />
-
-        <div className="opportunityMainStack">
-          <div className="opportunityCoreGrid">
-            <OpportunityDecisionCard
-              signal={primarySignal}
-              isLoading={isLoading}
-              error={error}
-              formatPrice={formatPrice}
-            />
-            {chartSlot}
+        <div className="opportunityChartStage">{chartSlot}</div>
+        <div className="opportunityAnalysisStage">
+          <div className="opportunityStageHeader">
+            <Target size={18} />
+            <div>
+              <h4>Decisão da IA e fundamentos</h4>
+              <span>Leitura operacional, níveis de risco e critérios técnicos consolidados</span>
+            </div>
           </div>
-
+          <OpportunityDecisionCard
+            signal={primarySignal}
+            isLoading={isLoading}
+            error={error}
+            formatPrice={formatPrice}
+          />
           <ContextPanel
             signal={primarySignal}
             result={result}
@@ -163,7 +166,7 @@ function TradingConfigPanel({
       </div>
 
       <form className="tradingConfigForm" onSubmit={onSubmit}>
-        <label>
+        <label className="configField configField--asset">
           Ativo / símbolo
           <select
             value={form.symbol}
@@ -177,7 +180,7 @@ function TradingConfigPanel({
           </select>
         </label>
 
-        <label>
+        <label className="configField">
           Tipo de operação
           <select
             value={form.strategy_type}
@@ -188,7 +191,7 @@ function TradingConfigPanel({
           </select>
         </label>
 
-        <label>
+        <label className="configField">
           Timeframe
           <select
             value={form.timeframe}
@@ -202,7 +205,7 @@ function TradingConfigPanel({
           </select>
         </label>
 
-        <label>
+        <label className="configField">
           Perfil de risco
           <select
             value={form.risk_profile}
@@ -239,7 +242,7 @@ function TradingConfigPanel({
           </label>
         </div>
 
-        <label>
+        <label className="configField configField--provider">
           Provider de dados
           <select
             value={form.provider}
@@ -249,6 +252,7 @@ function TradingConfigPanel({
             <option value="yfinance">yFinance</option>
             <option value="mt5">MT5 / Corretora</option>
           </select>
+          {form.provider === "mt5" ? <small>Ativos e candles fornecidos diretamente pelo servidor da corretora.</small> : null}
         </label>
 
         <div className="configSplit">
@@ -275,7 +279,7 @@ function TradingConfigPanel({
           </label>
         </div>
 
-        <button className="tradeActionButton" disabled={isLoading} type="submit">
+        <button className="tradeActionButton tradingConfigSubmit" disabled={isLoading} type="submit">
           {isLoading ? <Loader2 size={17} /> : <Sparkles size={17} />}
           {isLoading ? "Analisando..." : "Analisar oportunidade"}
         </button>
