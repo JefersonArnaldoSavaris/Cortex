@@ -1,5 +1,6 @@
 from typing import Optional
 import datetime
+import json
 import typer
 from pathlib import Path
 from functools import wraps
@@ -24,8 +25,8 @@ from rich import box
 from rich.align import Align
 from rich.rule import Rule
 
-from tradingagents.graph.trading_graph import TradingAgentsGraph
-from tradingagents.default_config import DEFAULT_CONFIG
+from cortex.graph.trading_graph import CortexGraph
+from cortex.default_config import DEFAULT_CONFIG
 from cli.models import AnalystType
 from cli.utils import *
 from cli.announcements import fetch_announcements, display_announcements
@@ -34,8 +35,8 @@ from cli.stats_handler import StatsCallbackHandler
 console = Console()
 
 app = typer.Typer(
-    name="TradingAgents",
-    help="TradingAgents CLI: Multi-Agents LLM Financial Trading Framework",
+    name="Cortex",
+    help="Cortex CLI: Multi-Agents LLM Financial Trading Framework",
     add_completion=True,  # Enable shell completion
 )
 
@@ -257,9 +258,9 @@ def update_display(layout, spinner_text=None, stats_handler=None, start_time=Non
     # Header with welcome message
     layout["header"].update(
         Panel(
-            "[bold green]Welcome to TradingAgents CLI[/bold green]\n"
-            "[dim]© [Tauric Research](https://github.com/TauricResearch)[/dim]",
-            title="Welcome to TradingAgents",
+            "[bold green]Welcome to Cortex CLI[/bold green]\n"
+            "[dim]© [Cortex](https://github.com/JefersonArnaldoSavaris/Cortex)[/dim]",
+            title="Welcome to Cortex",
             border_style="green",
             padding=(1, 2),
             expand=True,
@@ -468,11 +469,11 @@ def get_user_selections():
 
     # Create welcome box content
     welcome_content = f"{welcome_ascii}\n"
-    welcome_content += "[bold green]TradingAgents: Multi-Agents LLM Financial Trading Framework - CLI[/bold green]\n\n"
+    welcome_content += "[bold green]Cortex: Multi-Agents LLM Financial Trading Framework - CLI[/bold green]\n\n"
     welcome_content += "[bold]Workflow Steps:[/bold]\n"
     welcome_content += "I. Analyst Team → II. Research Team → III. Trader → IV. Risk Management → V. Portfolio Management\n\n"
     welcome_content += (
-        "[dim]Built by [Tauric Research](https://github.com/TauricResearch)[/dim]"
+        "[dim]Built by [Cortex](https://github.com/JefersonArnaldoSavaris/Cortex)[/dim]"
     )
 
     # Create and center the welcome box
@@ -480,7 +481,7 @@ def get_user_selections():
         welcome_content,
         border_style="green",
         padding=(1, 2),
-        title="Welcome to TradingAgents",
+        title="Welcome to Cortex",
         subtitle="Multi-Agents LLM Financial Trading Framework",
     )
     console.print(Align.center(welcome_box))
@@ -953,7 +954,7 @@ def run_analysis(checkpoint: bool = False):
     selected_analyst_keys = [a for a in ANALYST_ORDER if a in selected_set]
 
     # Initialize the graph with callbacks bound to LLMs
-    graph = TradingAgentsGraph(
+    graph = CortexGraph(
         selected_analyst_keys,
         config=config,
         debug=True,
@@ -1211,10 +1212,45 @@ def analyze(
     ),
 ):
     if clear_checkpoints:
-        from tradingagents.graph.checkpointer import clear_all_checkpoints
+        from cortex.graph.checkpointer import clear_all_checkpoints
         n = clear_all_checkpoints(DEFAULT_CONFIG["data_cache_dir"])
         console.print(f"[yellow]Cleared {n} checkpoint(s).[/yellow]")
     run_analysis(checkpoint=checkpoint)
+
+
+@app.command()
+def opportunities(
+    symbol: str = typer.Option("SPY", "--symbol", "-s", help="Ticker/symbol to analyze."),
+    strategy_type: str = typer.Option("daytrade", "--strategy-type", help="daytrade or swingtrade."),
+    timeframe: str = typer.Option("M15", "--timeframe", help="M1, M5, M15, M30, H1, H4 or D1."),
+    risk_profile: str = typer.Option("moderado", "--risk-profile", help="conservador, moderado or agressivo."),
+    capital: float = typer.Option(10_000.0, "--capital", help="Estimated capital for sizing simulation."),
+    max_risk_per_trade: float = typer.Option(0.01, "--max-risk-per-trade", help="Maximum risk per trade as a decimal."),
+    max_signals: int = typer.Option(1, "--max-signals", help="Maximum number of signals to return."),
+    provider: str = typer.Option("mock", "--provider", help="mock, yfinance or mt5."),
+    limit: int = typer.Option(160, "--limit", help="Number of OHLCV bars to evaluate."),
+    no_audit_log: bool = typer.Option(False, "--no-audit-log", help="Do not append the opportunity audit log."),
+):
+    """Generate educational short-term trading opportunity signals.
+
+    This command never places real orders. MT5 is present only as a safe stub.
+    """
+    from cortex.trading_opportunities import OpportunityRequest, TradingOpportunityAgent
+
+    request = OpportunityRequest(
+        symbol=symbol,
+        strategy_type=strategy_type,
+        timeframe=timeframe,
+        risk_profile=risk_profile,
+        capital=capital,
+        max_risk_per_trade=max_risk_per_trade,
+        max_signals=max_signals,
+        provider=provider,
+        limit=limit,
+    )
+    agent = TradingOpportunityAgent(log_path=None) if no_audit_log else TradingOpportunityAgent()
+    result = agent.analyze(request)
+    console.print_json(json.dumps(result.model_dump(mode="json"), ensure_ascii=False))
 
 
 if __name__ == "__main__":

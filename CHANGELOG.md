@@ -1,6 +1,6 @@
 # Changelog
 
-All notable changes to TradingAgents are documented here.
+All notable changes to Cortex are documented here.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
@@ -20,11 +20,11 @@ Breaking changes within the 0.x line are called out explicitly.
 - **LangGraph checkpoint resume** — opt-in via `--checkpoint`. State is saved
   after each node so crashed or interrupted runs resume from the last
   successful step. Per-ticker SQLite databases under
-  `~/.tradingagents/cache/checkpoints/`. `--clear-checkpoints` resets them. (#594)
+  `~/.cortex/cache/checkpoints/`. `--clear-checkpoints` resets them. (#594)
 - **Persistent decision log** replacing the per-agent BM25 memory. Decisions
   are stored automatically at the end of `propagate()`; the next same-ticker
   run resolves prior pending entries with realised return, alpha vs SPY, and
-  a one-paragraph reflection. Override path with `TRADINGAGENTS_MEMORY_LOG_PATH`.
+  a one-paragraph reflection. Override path with `CORTEX_MEMORY_LOG_PATH`.
   Optional `memory_log_max_entries` config caps resolved entries; pending
   entries are never pruned. (#578, #563, #564, #579)
 - **DeepSeek, Qwen (Alibaba DashScope), GLM (Zhipu), and Azure OpenAI**
@@ -49,7 +49,7 @@ Breaking changes within the 0.x line are called out explicitly.
   overriding `backend_url`. The CLI flow is unaffected.
 - All file I/O passes explicit `encoding="utf-8"` so Windows users no longer
   hit `UnicodeEncodeError` with the cp1252 default. (#543, #550, #576)
-- Cache and log directories moved to `~/.tradingagents/` to resolve Docker
+- Cache and log directories moved to `~/.cortex/` to resolve Docker
   permission issues. (#519)
 - `SignalProcessor` reads the rating from the Portfolio Manager's rendered
   markdown via a deterministic heuristic — no extra LLM call.
@@ -209,7 +209,7 @@ production-ready surfaces.
 - **Post-analysis report saving** — the framework writes per-section markdown
   files (analyst reports, debate transcripts, final decision) when a run
   completes.
-- **Announcements panel** — fetches updates from `api.tauric.ai/v1/announcements`
+- **Announcements panel** — fetches updates from ``
   for the CLI welcome screen.
 - **Tool fallbacks** so a single vendor outage does not stop the pipeline.
 
@@ -251,16 +251,16 @@ PRs from late 2025 also landed here.
 
 ### Added
 
-- **Initial public release** of the TradingAgents multi-agent trading
+- **Initial public release** of the Cortex multi-agent trading
   framework: market / sentiment / news / fundamentals analysts; bull and bear
   researchers; trader; aggressive, conservative, and neutral risk debaters;
   portfolio manager. LangGraph orchestration, yfinance data, per-agent
   BM25 memory, single-provider OpenAI integration, interactive CLI.
 
-[0.2.4]: https://github.com/TauricResearch/TradingAgents/compare/v0.2.3...v0.2.4
-[0.2.3]: https://github.com/TauricResearch/TradingAgents/compare/v0.2.2...v0.2.3
-[0.2.2]: https://github.com/TauricResearch/TradingAgents/compare/v0.2.1...v0.2.2
-[0.2.1]: https://github.com/TauricResearch/TradingAgents/compare/v0.2.0...v0.2.1
-[0.2.0]: https://github.com/TauricResearch/TradingAgents/compare/v0.1.1...v0.2.0
-[0.1.1]: https://github.com/TauricResearch/TradingAgents/compare/v0.1.0...v0.1.1
-[0.1.0]: https://github.com/TauricResearch/TradingAgents/releases/tag/v0.1.0
+[0.2.4]: https://github.com/JefersonArnaldoSavaris/Cortex/compare/v0.2.3...v0.2.4
+[0.2.3]: https://github.com/JefersonArnaldoSavaris/Cortex/compare/v0.2.2...v0.2.3
+[0.2.2]: https://github.com/JefersonArnaldoSavaris/Cortex/compare/v0.2.1...v0.2.2
+[0.2.1]: https://github.com/JefersonArnaldoSavaris/Cortex/compare/v0.2.0...v0.2.1
+[0.2.0]: https://github.com/JefersonArnaldoSavaris/Cortex/compare/v0.1.1...v0.2.0
+[0.1.1]: https://github.com/JefersonArnaldoSavaris/Cortex/compare/v0.1.0...v0.1.1
+[0.1.0]: https://github.com/JefersonArnaldoSavaris/Cortex/releases/tag/v0.1.0
