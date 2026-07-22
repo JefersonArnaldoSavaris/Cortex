@@ -35,6 +35,81 @@ class AnalysisStatus(str, Enum):
     FAILED = "failed"
 
 
+class UserRole(str, Enum):
+    ADMIN = "admin"
+    USER = "user"
+
+
+class UserPlan(str, Enum):
+    FREE = "free"
+    PRO = "pro"
+    ENTERPRISE = "enterprise"
+
+
+class UserStatus(str, Enum):
+    ACTIVE = "active"
+    INACTIVE = "inactive"
+    TRIAL = "trial"
+    BLOCKED = "blocked"
+
+
+class RegisterRequest(BaseModel):
+    name: str = Field(min_length=2, max_length=120)
+    email: str = Field(min_length=5, max_length=254)
+    password: str = Field(min_length=8, max_length=256)
+    accepted_terms: bool
+
+
+class LoginRequest(BaseModel):
+    email: str = Field(min_length=5, max_length=254)
+    password: str = Field(min_length=1, max_length=256)
+
+
+class ForgotPasswordRequest(BaseModel):
+    email: str = Field(min_length=5, max_length=254)
+
+
+class AuthUser(BaseModel):
+    id: str
+    name: str
+    email: str
+    role: UserRole
+    plan: UserPlan
+    status: UserStatus
+    created_at: datetime
+    updated_at: datetime
+    last_login_at: datetime | None = None
+
+
+class AuthResponse(BaseModel):
+    user: AuthUser
+
+
+class MessageResponse(BaseModel):
+    message: str
+
+
+class MT5ConnectRequest(BaseModel):
+    login: int = Field(gt=0)
+    password: str = Field(min_length=1)
+    server: str = Field(min_length=2)
+    terminal_path: str | None = None
+
+
+class MT5StatusResponse(BaseModel):
+    connected: bool
+    login: int | None = None
+    server: str | None = None
+    name: str | None = None
+    company: str | None = None
+    currency: str | None = None
+    balance: float | None = None
+    equity: float | None = None
+    margin: float | None = None
+    trade_allowed: bool | None = None
+    message: str
+
+
 class AnalysisRequest(BaseModel):
     ticker: str = Field(default="SPY", min_length=1, max_length=32, examples=["SPY"])
     analysis_date: str = Field(

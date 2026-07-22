@@ -21,9 +21,14 @@ class YFinanceMarketDataProvider(MarketDataProvider):
     def get_ohlcv(self, symbol: str, timeframe: Timeframe, limit: int) -> Sequence[OHLCVBar]:
         import yfinance as yf
 
+        provider_symbol = {
+            "BTC": "BTC-USD",
+            "BTCUSD": "BTC-USD",
+            "XAUUSD": "GC=F",
+        }.get(symbol.upper(), symbol)
         interval = TIMEFRAME_TO_YFINANCE_INTERVAL[timeframe.value]
         period = "7d" if timeframe in {Timeframe.M1, Timeframe.M5, Timeframe.M15, Timeframe.M30} else "1y"
-        frame = yf.Ticker(symbol).history(period=period, interval=interval, auto_adjust=False)
+        frame = yf.Ticker(provider_symbol).history(period=period, interval=interval, auto_adjust=False)
         if frame.empty:
             raise ValueError(f"No OHLCV data returned by yFinance for {symbol}")
 
