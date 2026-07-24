@@ -5,6 +5,7 @@ import type { ReactNode } from "react";
 import {
   Apple,
   BrainCircuit,
+  ChevronRight,
   Chrome,
   Eye,
   EyeOff,
@@ -53,15 +54,34 @@ function getPasswordScore(password: string) {
 
 export function AuthScreen(props: AuthScreenProps) {
   return (
-    <AuthShell>
-      <AuthMarketingPanel />
-      <AuthCard {...props} />
+    <AuthShell onEnter={() => props.onModeChange("login")}>
+      <div className="authHomeGrid">
+        <AuthMarketingPanel />
+        <AuthCard {...props} />
+      </div>
     </AuthShell>
   );
 }
 
-function AuthShell({ children }: { children: ReactNode }) {
-  return <main className="authShell authShell--premium">{children}</main>;
+function AuthShell({ children, onEnter }: { children: ReactNode; onEnter: () => void }) {
+  return (
+    <main className="authShell authShell--premium">
+      <header className="authPublicHeader">
+        <div className="authBrand">
+          <div className="authBrandMark"><Radar size={25} /></div>
+          <div><strong>Cortex</strong><span>AI Trading Intelligence</span></div>
+        </div>
+        <nav aria-label="Navegação pública">
+          <a href="#recursos">Recursos</a>
+          <a href="#acesso">Planos</a>
+          <a href="#seguranca">Segurança</a>
+          <a href="#acesso">Suporte</a>
+          <button onClick={onEnter} type="button">Entrar</button>
+        </nav>
+      </header>
+      {children}
+    </main>
+  );
 }
 
 function AuthMarketingPanel() {
@@ -70,39 +90,29 @@ function AuthMarketingPanel() {
       <div className="authAura authAura--primary" />
       <div className="authAura authAura--secondary" />
 
-      <div className="authBrand">
-        <div className="authBrandMark">
-          <Radar size={25} />
-        </div>
-        <div>
-          <strong>Cortex</strong>
-          <span>AI Trading Intelligence</span>
-        </div>
-      </div>
-
       <div className="authMarketingCopy">
-        <p className="eyebrow">Fintech intelligence layer</p>
-        <h1>Inteligência, dados e estratégia para <span>decisões superiores.</span></h1>
+        <h1>
+          Inteligência, dados<br />
+          e estratégia para<br />
+          <span>decisões superiores.</span>
+        </h1>
         <p>
-          Uma plataforma para pesquisar ativos, detectar oportunidades, acompanhar risco e preparar
-          integrações operacionais com governança desde o primeiro acesso.
+          Pesquise ativos, identifique oportunidades, acompanhe riscos e prepare integrações
+          operacionais com governança desde o primeiro acesso.
         </p>
       </div>
 
-      <div className="authBenefitGrid">
+      <div className="authBenefitGrid" id="recursos">
         <BenefitCard icon={BrainCircuit} title="Análises com IA" detail="Agentes especializados para mercado, notícias, sentimento e fundamentos." />
         <BenefitCard icon={LineChart} title="Oportunidades de Trade" detail="Leituras de Day Trade e Swing Trade com contexto técnico." />
         <BenefitCard icon={Gauge} title="Gestão de Risco" detail="Base para limites por plano, exposição e disciplina operacional." />
         <BenefitCard icon={Network} title="Integrações Futuras" detail="MT5 e automações preparadas com arquitetura segura." />
       </div>
 
-      <PlatformMockup />
-
-      <footer className="authTrustFooter">
+      <footer className="authTrustFooter" id="seguranca">
         <span><ShieldCheck size={18} /><strong>Segurança de ponta</strong><em>Dados protegidos com criptografia</em></span>
-        <span><ShieldCheck size={18} /><strong>Privacidade</strong><em>Transparência total no uso de dados</em></span>
-        <span><Gauge size={18} /><strong>Infraestrutura robusta</strong><em>Alta disponibilidade e performance</em></span>
-        <span><TrendingUp size={18} /><strong>Feito para performance</strong><em>Velocidade, estabilidade e escala</em></span>
+        <span><Gauge size={18} /><strong>Inteligência contínua</strong><em>Modelos atualizados em tempo real</em></span>
+        <span><TrendingUp size={18} /><strong>Sistema operacional estável</strong><em>Infraestrutura robusta e monitorada</em></span>
       </footer>
     </section>
   );
@@ -136,7 +146,7 @@ function PlatformMockup() {
           </div>
 
           <div className="phoneGreeting">
-            <span>Olá, Pedro! <em>PRO</em></span>
+            <span>Olá, Usuário! <em>PRO</em></span>
             <small>Plano Pro · válido até 20/08/2026</small>
           </div>
 
@@ -192,12 +202,33 @@ function PlatformMockup() {
   );
 }
 
+function AuthMarketStrip() {
+  const markets = [
+    { symbol: "IBOV", name: "Ibovespa", price: "128.497,12", change: "+1,24%", tone: "up", path: "M2 34 C14 35,18 18,30 24 S47 42,58 21 S74 12,84 26 S101 31,118 15" },
+    { symbol: "WINQ26", name: "Ibovespa Fut.", price: "129.150", change: "+1,18%", tone: "up", path: "M2 36 C14 30,24 35,34 24 S48 19,56 8 S70 6,78 22 S94 18,104 27 S114 20,118 19" },
+    { symbol: "DÓLAR", name: "USDBRL", price: "5,4432", change: "-0,31%", tone: "down", path: "M2 12 C14 13,18 29,30 17 S45 12,55 27 S70 33,80 19 S96 29,106 33 S114 36,118 37" },
+    { symbol: "BTCUSD", name: "Bitcoin / Dólar", price: "64.876,26", change: "-4,46%", tone: "down", path: "M2 24 C14 29,20 20,30 22 S43 5,55 12 S70 35,82 24 S96 30,106 36 S114 34,118 39" },
+    { symbol: "SPY", name: "SPDR S&P 500 ETF", price: "548,21", change: "+0,62%", tone: "up", path: "M2 36 C15 36,22 25,34 28 S48 11,60 9 S73 30,84 25 S98 31,108 22 S114 20,118 22" },
+  ];
+  return (
+    <section className="authMarketStrip" aria-label="Resumo de mercados">
+      {markets.map((market) => (
+        <article className={`authMarketCard authMarketCard--${market.tone}`} key={market.symbol}>
+          <div><strong>{market.symbol}</strong><span>{market.name}</span><b>{market.price}</b><em>{market.change}</em></div>
+          <svg viewBox="0 0 120 44" aria-hidden="true"><path d={market.path} /></svg>
+        </article>
+      ))}
+    </section>
+  );
+}
+
 function BenefitCard({ detail, icon: Icon, title }: { detail: string; icon: LucideIcon; title: string }) {
   return (
     <article className="authBenefitCard">
       <Icon size={19} />
       <strong>{title}</strong>
       <span>{detail}</span>
+      <ChevronRight className="authBenefitArrow" size={17} />
     </article>
   );
 }
@@ -272,7 +303,7 @@ function AuthCard({
   }
 
   return (
-    <section className="authCardPanel" aria-live="polite">
+    <section className="authCardPanel" id="acesso" aria-live="polite">
       <div className="authCardGlow" />
       <div className="authModeTabs authModeTabs--premium">
         <button className={mode === "login" ? "active" : ""} onClick={() => resetMode("login")} type="button">Entrar</button>
@@ -288,9 +319,9 @@ function AuthCard({
           </div>
           <div className="authDivider"><span>ou</span></div>
           <FieldShell icon={Mail} label="E-mail ou usuário">
-            <input autoComplete="email" type="email" value={loginEmail} onChange={(event) => setLoginEmail(event.target.value)} />
+            <input autoComplete="email" placeholder="seu@email.com" type="email" value={loginEmail} onChange={(event) => setLoginEmail(event.target.value)} />
           </FieldShell>
-          <PasswordInput label="Senha" autoComplete="current-password" value={loginPassword} onChange={setLoginPassword} />
+          <PasswordInput label="Senha" placeholder="Digite sua senha" autoComplete="current-password" value={loginPassword} onChange={setLoginPassword} />
           <div className="loginOptionsRow">
             <label className="rememberRow">
               <input checked={rememberMe} type="checkbox" onChange={(event) => setRememberMe(event.target.checked)} />
@@ -307,19 +338,18 @@ function AuthCard({
           <p className="authSwitchText">
             Não tem uma conta? <button onClick={() => resetMode("register")} type="button">Criar conta</button>
           </p>
-          <SecurityBadge />
         </form>
       ) : mode === "register" ? (
         <form className="authForm authForm--premium" onSubmit={submitRegister}>
           <AuthTitle icon={UserRound} title="Criar conta Cortex" subtitle="Comece no plano free e evolua para recursos comerciais." />
           <FieldShell icon={UserRound} label="Nome completo">
-            <input autoComplete="name" value={registerName} onChange={(event) => setRegisterName(event.target.value)} />
+            <input autoComplete="name" placeholder="Seu nome" value={registerName} onChange={(event) => setRegisterName(event.target.value)} />
           </FieldShell>
           <FieldShell icon={Mail} label="E-mail">
-            <input autoComplete="email" type="email" value={registerEmail} onChange={(event) => setRegisterEmail(event.target.value)} />
+            <input autoComplete="email" placeholder="seu@email.com" type="email" value={registerEmail} onChange={(event) => setRegisterEmail(event.target.value)} />
           </FieldShell>
-          <PasswordInput label="Senha" autoComplete="new-password" value={registerPassword} onChange={setRegisterPassword} />
-          <PasswordInput label="Confirmar senha" autoComplete="new-password" value={registerPasswordConfirmation} onChange={setRegisterPasswordConfirmation} />
+          <PasswordInput label="Senha" placeholder="Crie uma senha segura" autoComplete="new-password" value={registerPassword} onChange={setRegisterPassword} />
+          <PasswordInput label="Confirmar senha" placeholder="Repita sua senha" autoComplete="new-password" value={registerPasswordConfirmation} onChange={setRegisterPasswordConfirmation} />
           <PasswordStrength password={registerPassword} />
           <label className="termsRow termsRow--premium">
             <input checked={acceptedTerms} type="checkbox" onChange={(event) => setAcceptedTerms(event.target.checked)} />
@@ -338,7 +368,7 @@ function AuthCard({
         <form className="authForm authForm--premium" onSubmit={submitForgot}>
           <AuthTitle icon={Mail} title="Recuperar senha" subtitle="Enviaremos instruções se o e-mail estiver cadastrado." />
           <FieldShell icon={Mail} label="E-mail">
-            <input autoComplete="email" type="email" value={forgotEmail} onChange={(event) => setForgotEmail(event.target.value)} />
+            <input autoComplete="email" placeholder="seu@email.com" type="email" value={forgotEmail} onChange={(event) => setForgotEmail(event.target.value)} />
           </FieldShell>
           <AuthFeedback error={activeError} info={info} />
           <button className="authPrimaryButton" disabled={isLoading} type="submit">
@@ -348,7 +378,6 @@ function AuthCard({
           <p className="authSwitchText">
             Lembrou a senha? <button onClick={() => resetMode("login")} type="button">Voltar ao login</button>
           </p>
-          <SecurityBadge />
         </form>
       )}
     </section>
@@ -372,7 +401,6 @@ function SocialLoginButton({ icon: Icon, label }: { icon: LucideIcon; label: str
     <button className="socialLoginButton" disabled title="Em breve" type="button">
       <Icon size={18} />
       <span>{label}</span>
-      <em>Em breve</em>
     </button>
   );
 }
@@ -393,11 +421,13 @@ function PasswordInput({
   autoComplete,
   label,
   onChange,
+  placeholder,
   value,
 }: {
   autoComplete: string;
   label: string;
   onChange: (value: string) => void;
+  placeholder: string;
   value: string;
 }) {
   const [isVisible, setIsVisible] = useState(false);
@@ -407,7 +437,7 @@ function PasswordInput({
       <span>{label}</span>
       <div className="authFieldControl authFieldControl--password">
         <Lock size={17} />
-        <input autoComplete={autoComplete} type={isVisible ? "text" : "password"} value={value} onChange={(event) => onChange(event.target.value)} />
+        <input autoComplete={autoComplete} placeholder={placeholder} type={isVisible ? "text" : "password"} value={value} onChange={(event) => onChange(event.target.value)} />
         <button aria-label={isVisible ? "Ocultar senha" : "Mostrar senha"} onClick={() => setIsVisible((current) => !current)} type="button">
           {isVisible ? <EyeOff size={17} /> : <Eye size={17} />}
         </button>
@@ -441,16 +471,3 @@ function AuthFeedback({ error, info }: { error: string | null; info: string | nu
     </>
   );
 }
-
-function SecurityBadge() {
-  return (
-    <div className="securityBadge">
-      <ShieldCheck size={17} />
-      <div>
-        <strong>Seus dados estão protegidos</strong>
-        <span>Sessão segura com cookie HttpOnly e sem senha no navegador.</span>
-      </div>
-    </div>
-  );
-}
-

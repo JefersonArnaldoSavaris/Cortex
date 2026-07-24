@@ -31,8 +31,8 @@ class TradingOpportunityAgent:
             request=request,
             signals=signals,
             warnings=[
-                "Trading Opportunities is an educational analysis module.",
-                "The current MT5 integration is a non-executing stub.",
+                "O módulo de oportunidades fornece análises exclusivamente educacionais.",
+                "A integração atual com o MT5 não executa ordens.",
             ],
         )
         self._store_audit_entry(result)

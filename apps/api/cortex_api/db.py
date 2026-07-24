@@ -5,8 +5,11 @@ from collections.abc import Iterator
 from contextlib import contextmanager
 from pathlib import Path
 
+from dotenv import load_dotenv
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session, sessionmaker
+
+load_dotenv()
 
 
 def _normalize_sqlite_url(database_url: str) -> str:
@@ -48,7 +51,10 @@ else:
             "pool_size": int(os.getenv("CORTEX_DB_POOL_SIZE", "5")),
             "max_overflow": int(os.getenv("CORTEX_DB_MAX_OVERFLOW", "5")),
             "pool_recycle": int(os.getenv("CORTEX_DB_POOL_RECYCLE_SECONDS", "300")),
-            "connect_args": {"prepare_threshold": None},
+            "connect_args": {
+                "prepare_threshold": None,
+                "options": "-csearch_path=cortex,public",
+            },
         }
     )
 

@@ -2,13 +2,16 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
-  Activity,
-  Bell,
+  Building2,
   FileText,
-  LineChart,
+  HardDrive,
+  LockKeyhole,
   Network,
   Play,
   RefreshCw,
+  Server,
+  UserRound,
+  Wallet,
 } from "lucide-react";
 import { CandlestickSeries, ColorType, type ISeriesApi, UTCTimestamp, createChart } from "lightweight-charts";
 import ReactMarkdown from "react-markdown";
@@ -16,10 +19,8 @@ import remarkGfm from "remark-gfm";
 
 import {
   AppShell,
-  DashboardHome,
   EmptyState,
   ErrorState,
-  FeaturePlaceholder,
   LoadingState,
   type SessionUser,
   type ViewKey,
@@ -148,41 +149,40 @@ const statusLabels: Record<AnalysisStatus, string> = {
   failed: "Falhou",
 };
 
-const intervalOptions = [
-  { value: "1m", label: "1m" },
-  { value: "5m", label: "5m" },
-  { value: "15m", label: "15m" },
-  { value: "1h", label: "1h" },
-  { value: "4h", label: "4h" },
-  { value: "1d", label: "1D" },
-];
-
 const periodOptionsByInterval: Record<string, Array<{ value: string; label: string }>> = {
-  "1m": [{ value: "1d", label: "1D" }],
+  "1m": [
+    { value: "1d", label: "1D" },
+    { value: "7d", label: "7D" },
+  ],
   "5m": [
     { value: "1d", label: "1D" },
     { value: "5d", label: "5D" },
+    { value: "60d", label: "60D" },
   ],
   "15m": [
     { value: "1d", label: "1D" },
     { value: "5d", label: "5D" },
     { value: "1mo", label: "1M" },
+    { value: "60d", label: "60D" },
   ],
   "1h": [
     { value: "5d", label: "5D" },
     { value: "1mo", label: "1M" },
     { value: "3mo", label: "3M" },
+    { value: "2y", label: "2A" },
   ],
   "4h": [
     { value: "1mo", label: "1M" },
     { value: "3mo", label: "3M" },
     { value: "6mo", label: "6M" },
+    { value: "2y", label: "2A" },
   ],
   "1d": [
     { value: "1mo", label: "1M" },
     { value: "3mo", label: "3M" },
     { value: "6mo", label: "6M" },
     { value: "1y", label: "1A" },
+    { value: "max", label: "Máximo" },
   ],
 };
 
@@ -191,15 +191,6 @@ const eventLabels: Record<string, string> = {
   "Worker started": "Processamento iniciado",
   "Building Cortex graph": "Preparando agentes",
   "Report saved": "Relatório salvo",
-};
-
-const intervalLabels: Record<string, string> = {
-  "1m": "1 minuto",
-  "5m": "5 minutos",
-  "15m": "15 minutos",
-  "1h": "1 hora",
-  "4h": "4 horas",
-  "1d": "1 dia",
 };
 
 const timeframeToChartInterval: Record<OpportunityTimeframe, string> = {
@@ -325,6 +316,7 @@ function getProgressStages(events: AnalysisRecord["events"], status: AnalysisSta
 }
 
 function CandleChart({
+  assetName,
   points,
   interval,
   period,
@@ -332,6 +324,7 @@ function CandleChart({
   liveCandle,
   streamStatus,
 }: {
+  assetName?: string;
   points: PricePoint[];
   interval: string;
   period: string;
@@ -477,6 +470,7 @@ function CandleChart({
   return (
     <div className="chartBox">
       <div className="chartStats">
+        {assetName ? <span className="chartAssetName">{assetName}</span> : null}
         <span className={`liveStreamBadge liveStreamBadge--${streamStatus}`}>
           <i /> {streamStatus === "live" ? "Tempo real" : streamStatus === "connecting" ? "Conectando" : streamStatus === "reconnecting" ? "Reconectando" : streamStatus === "error" ? "Stream indisponível" : "Snapshot"}
         </span>
@@ -532,7 +526,7 @@ export default function Dashboard() {
   const [history, setHistory] = useState<PricePoint[]>([]);
   const [liveCandle, setLiveCandle] = useState<PricePoint | null>(null);
   const [streamStatus, setStreamStatus] = useState<StreamStatus>("offline");
-  const [activeView, setActiveView] = useState<ViewKey>("dashboard");
+  const [activeView, setActiveView] = useState<ViewKey>("oportunidades-micro");
   const [chartInterval, setChartInterval] = useState("1d");
   const [chartPeriod, setChartPeriod] = useState("6mo");
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -567,7 +561,7 @@ export default function Dashboard() {
     capital: 10_000,
     max_risk_per_trade: 0.01,
     max_signals: 1,
-    provider: "mock",
+    provider: "yfinance",
     limit: 160,
   });
 
@@ -676,35 +670,42 @@ export default function Dashboard() {
     null;
   const selectedAnalysis =
     completedAnalyses.find((analysis) => analysis.id === selectedId) ?? completedAnalyses[0] ?? null;
-  const chartSymbol = activeView === "oportunidades-micro"
+  const requestedChartSymbol = activeView === "oportunidades-micro"
     ? (marketDataProvider === "mt5"
         ? (opportunityForm.symbol.trim() || "SPY")
         : (opportunityForm.symbol.trim().toUpperCase() || "SPY"))
     : form.ticker;
   const opportunityAssets = marketDataProvider === "mt5" && mt5Assets.length > 0 ? mt5Assets : (options?.assets ?? []);
+  const chartSymbol = marketDataProvider === "mt5"
+    ? (mt5Assets.find((asset) => asset.symbol === requestedChartSymbol)?.symbol ?? mt5Assets[0]?.symbol ?? "")
+    : requestedChartSymbol;
   const selectedAsset = [...(options?.assets ?? []), ...mt5Assets].find((asset) => asset.symbol === chartSymbol);
+  const marketSummary = useMemo(() => {
+    if (history.length < 2) return null;
+    const first = history[0];
+    const last = history[history.length - 1];
+    const closes = history.map((point) => point.close);
+    const change = last.close - first.close;
+    return {
+      name: selectedAsset?.name ?? chartSymbol,
+      latest: last.close,
+      min: Math.min(...closes),
+      max: Math.max(...closes),
+      change,
+      changePct: (change / first.close) * 100,
+    };
+  }, [chartSymbol, history, selectedAsset?.name]);
   const opportunitySignal = opportunityResult?.signals[0] ?? null;
   const periodOptions = periodOptionsByInterval[chartInterval] ?? periodOptionsByInterval["1d"];
   const activeChartPeriod = periodOptions.some((period) => period.value === chartPeriod)
     ? chartPeriod
     : (periodOptions[0]?.value ?? chartPeriod);
   const activeProgressStages = activeAnalysis ? getProgressStages(activeAnalysis.events, activeAnalysis.status) : [];
-  const marketStats = useMemo(() => {
-    if (history.length < 2) {
-      return { latestPrice: "-", changePct: 0 };
-    }
-    const first = history[0];
-    const last = history[history.length - 1];
-    return {
-      latestPrice: formatPrice(last.close),
-      changePct: ((last.close - first.close) / first.close) * 100,
-    };
-  }, [history]);
 
   function updateChartInterval(nextInterval: string) {
     const nextPeriods = periodOptionsByInterval[nextInterval] ?? periodOptionsByInterval["1d"];
     setChartInterval(nextInterval);
-    setChartPeriod(nextPeriods[0]?.value ?? "1mo");
+    setChartPeriod(nextPeriods[nextPeriods.length - 1]?.value ?? "1y");
   }
 
   async function loadOptions() {
@@ -816,6 +817,8 @@ export default function Dashboard() {
 
   useEffect(() => {
     if (!user) return;
+    if (activeView === "integracoes") return;
+    if (marketDataProvider === "mt5" && (!mt5Status.connected || mt5Assets.length === 0)) return;
     if (activeChartPeriod !== chartPeriod) {
       setChartPeriod(activeChartPeriod);
       return;
@@ -824,7 +827,7 @@ export default function Dashboard() {
       loadHistory(chartSymbol, activeChartPeriod, chartInterval).catch((err: Error) => setError(err.message));
     }, 350);
     return () => window.clearTimeout(timer);
-  }, [activeChartPeriod, chartInterval, chartPeriod, chartSymbol, marketDataProvider, user]);
+  }, [activeChartPeriod, activeView, chartInterval, chartPeriod, chartSymbol, marketDataProvider, mt5Assets.length, mt5Status.connected, user]);
 
   useEffect(() => {
     if (!user || marketDataProvider !== "mt5" || !mt5Status.connected || !chartSymbol) {
@@ -960,7 +963,7 @@ export default function Dashboard() {
         method: "POST",
         credentials: "include",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(opportunityForm),
+        body: JSON.stringify({ ...opportunityForm, provider: marketDataProvider }),
       });
       if (!response.ok) {
         const body = await response.json().catch(() => null);
@@ -1004,6 +1007,7 @@ export default function Dashboard() {
       setOpportunityForm((current) => ({ ...current, provider: "mt5" }));
       setMt5Form((current) => ({ ...current, password: "" }));
       await loadMt5Symbols();
+      setError(null);
     } catch (err) {
       setMt5Error(err instanceof Error ? err.message : "Erro inesperado ao conectar MT5.");
     } finally {
@@ -1021,7 +1025,7 @@ export default function Dashboard() {
       setMt5Status(data);
       setMarketDataProvider("yfinance");
       setMt5Assets([]);
-      setOpportunityForm((current) => ({ ...current, provider: "mock" }));
+      setOpportunityForm((current) => ({ ...current, provider: "yfinance" }));
     } catch (err) {
       setMt5Error(err instanceof Error ? err.message : "Erro inesperado ao desconectar MT5.");
     } finally {
@@ -1040,7 +1044,7 @@ export default function Dashboard() {
   }
 
   function returnHome() {
-    setActiveView("dashboard");
+    setActiveView("oportunidades-micro");
     setSelectedId(null);
     setReport("");
     setError(null);
@@ -1079,12 +1083,7 @@ export default function Dashboard() {
 
   const analysisControlPanel = (
     <form className="analysisForm" onSubmit={submitAnalysis}>
-      <div className="controlPanelTitle">
-        <span>AI research</span>
-        <strong>Nova análise</strong>
-      </div>
-
-      <label>
+      <label className="macroField macroField--asset">
         Ativo
         <select value={form.ticker} onChange={(event) => setForm({ ...form, ticker: event.target.value })}>
           {(options?.assets ?? [{ symbol: "SPY", name: "SPDR S&P 500 ETF", category: "ETF", default_provider_symbol: "SPY" }]).map(
@@ -1097,7 +1096,7 @@ export default function Dashboard() {
         </select>
       </label>
 
-      <label>
+      <label className="macroField">
         Data
         <input
           type="date"
@@ -1106,7 +1105,7 @@ export default function Dashboard() {
         />
       </label>
 
-      <label>
+      <label className="macroField">
         Provedor
         <select value={form.provider} onChange={(event) => syncModelDefaults(event.target.value)}>
           {Object.keys(options?.providers ?? { google: null }).map((provider) => (
@@ -1117,45 +1116,7 @@ export default function Dashboard() {
         </select>
       </label>
 
-      <label>
-        Modelo rápido
-        <select value={form.quick_model} onChange={(event) => setForm({ ...form, quick_model: event.target.value })}>
-          {(providerModels?.quick ?? []).map((model) => (
-            <option key={model.value} value={model.value}>
-              {model.label}
-            </option>
-          ))}
-        </select>
-      </label>
-
-      <label>
-        Modelo profundo
-        <select value={form.deep_model} onChange={(event) => setForm({ ...form, deep_model: event.target.value })}>
-          {(providerModels?.deep ?? []).map((model) => (
-            <option key={model.value} value={model.value}>
-              {model.label}
-            </option>
-          ))}
-        </select>
-      </label>
-
-      <div className="fieldGroup">
-        <span>Analistas</span>
-        <div className="toggleGrid">
-          {analystOptions.map((option) => (
-            <button
-              className={form.analysts.includes(option.value) ? "toggle active" : "toggle"}
-              key={option.value}
-              onClick={() => updateAnalysts(option.value)}
-              type="button"
-            >
-              {option.label}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      <label>
+      <label className="macroField macroField--depth">
         Profundidade
         <input
           max={5}
@@ -1166,73 +1127,68 @@ export default function Dashboard() {
         />
       </label>
 
-      <label>
-        Idioma
-        <select value={form.output_language} onChange={(event) => setForm({ ...form, output_language: event.target.value })}>
-          <option value="Portuguese">Português</option>
-          <option value="English">Inglês</option>
-          <option value="Spanish">Espanhol</option>
-        </select>
-      </label>
-
       <button className="primaryButton" disabled={isSubmitting} type="submit">
         {isSubmitting ? <RefreshCw size={17} /> : <Play size={17} />}
-        Executar análise
+        Analisar cenário
       </button>
+
+      <details className="macroAdvancedSettings">
+        <summary>Configurações avançadas</summary>
+        <div className="macroAdvancedGrid">
+          <label>
+            Modelo rápido
+            <select value={form.quick_model} onChange={(event) => setForm({ ...form, quick_model: event.target.value })}>
+              {(providerModels?.quick ?? []).map((model) => (
+                <option key={model.value} value={model.value}>{model.label}</option>
+              ))}
+            </select>
+          </label>
+
+          <label>
+            Modelo profundo
+            <select value={form.deep_model} onChange={(event) => setForm({ ...form, deep_model: event.target.value })}>
+              {(providerModels?.deep ?? []).map((model) => (
+                <option key={model.value} value={model.value}>{model.label}</option>
+              ))}
+            </select>
+          </label>
+
+          <label>
+            Idioma
+            <select value={form.output_language} onChange={(event) => setForm({ ...form, output_language: event.target.value })}>
+              <option value="Portuguese">Português</option>
+              <option value="English">Inglês</option>
+              <option value="Spanish">Espanhol</option>
+            </select>
+          </label>
+
+          <div className="fieldGroup macroAnalystField">
+            <span>Analistas</span>
+            <div className="toggleGrid">
+              {analystOptions.map((option) => (
+                <button
+                  className={form.analysts.includes(option.value) ? "toggle active" : "toggle"}
+                  key={option.value}
+                  onClick={() => updateAnalysts(option.value)}
+                  type="button"
+                >
+                  {option.label}
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      </details>
     </form>
   );
 
   const marketPanel = (
           <section className="chartPanel">
-            <div className="sectionTitle">
-              <LineChart size={18} />
-              <h3>
-                Gráfico de {chartSymbol}
-                {selectedAsset ? <span>{selectedAsset.name}</span> : null}
-              </h3>
-            </div>
-            <div className="chartToolbar">
-              <div className="controlGroup">
-                <span>Resolução</span>
-                <div className="periodTabs">
-                  {intervalOptions.map((interval) => (
-                    <button
-                      className={chartInterval === interval.value ? "periodTab active" : "periodTab"}
-                      key={interval.value}
-                      onClick={() => updateChartInterval(interval.value)}
-                      type="button"
-                    >
-                      {interval.label}
-                    </button>
-                  ))}
-                </div>
-              </div>
-              <label className="rangeSelect">
-                <span>Histórico</span>
-                <select value={activeChartPeriod} onChange={(event) => setChartPeriod(event.target.value)}>
-                  {periodOptions.map((period) => (
-                    <option key={period.value} value={period.value}>
-                      {period.label}
-                    </option>
-                  ))}
-                </select>
-              </label>
-            </div>
-            <div className="chartHint">
-              <span>
-                Resolução atual: <strong>{intervalLabels[chartInterval] ?? chartInterval}</strong>
-              </span>
-              <span>
-                Janela: <strong>{periodOptions.find((item) => item.value === activeChartPeriod)?.label ?? activeChartPeriod}</strong>
-              </span>
-              <span>
-                Fonte: <strong>{marketDataProvider === "mt5" ? "MetaTrader 5" : "yFinance"}</strong>
-              </span>
-            </div>
             {isChartLoading ? (
               <LoadingState message="Carregando gráfico de mercado..." />
             ) : (
               <CandleChart
+                assetName={selectedAsset?.name}
                 points={history}
                 interval={chartInterval}
                 period={activeChartPeriod}
@@ -1254,25 +1210,11 @@ export default function Dashboard() {
       onNavigate={setActiveView}
       onLogout={logout}
       onRefresh={() => loadAnalyses()}
-      selectedSymbol={chartSymbol}
       user={user}
     >
       {error ? <ErrorState message={error} /> : null}
 
-      {activeView === "dashboard" ? (
-        <DashboardHome
-          activeAnalysisLabel={activeAnalysis ? `${activeAnalysis.request.ticker} em ${statusLabels[activeAnalysis.status]}` : "Nenhuma execução ativa"}
-          assetName={selectedAsset?.name ?? "Ativo monitorado"}
-          chartSlot={marketPanel}
-          completedCount={completedAnalyses.length}
-          latestPrice={marketStats.latestPrice}
-          marketChangePct={marketStats.changePct}
-          onOpenIntegrations={() => setActiveView("integracoes")}
-          onOpenOpportunities={() => setActiveView("oportunidades-micro")}
-          opportunitySignal={opportunitySignal}
-          selectedSymbol={form.ticker}
-        />
-      ) : activeView === "oportunidades-micro" ? (
+      {activeView === "oportunidades-micro" ? (
         <OpportunityWorkspace
           assets={opportunityAssets.length > 0 ? opportunityAssets : [
             { symbol: "SPY", name: "SPDR S&P 500 ETF", category: "ETF", default_provider_symbol: "SPY" },
@@ -1282,25 +1224,35 @@ export default function Dashboard() {
           form={opportunityForm}
           formatPrice={formatPrice}
           isLoading={isOpportunityLoading}
+          marketSummary={marketSummary}
           onSubmit={submitOpportunity}
           result={opportunityResult}
           setForm={setOpportunityForm}
         />
       ) : activeView === "oportunidades-macro" ? (
-          <section className="detailPanel detailPanelFull">
-            <div className="sectionTitle">
+          <section className="detailPanel detailPanelFull macroWorkspace">
+            <div className="sectionTitle macroWorkspaceTitle">
               <FileText size={18} />
-              <h3>Macro AI Research</h3>
+              <h3>
+                Macro AI Research
+                <span>Análise fundamentalista multiagente e contexto de mercado</span>
+              </h3>
             </div>
 
             <div className="macroResearchForm">
               {analysisControlPanel}
             </div>
 
-            {marketPanel}
+            <div className="macroOverviewGrid">
+              <div className="macroChartPanel">{marketPanel}</div>
+              <aside className="macroActivityPanel">
+                <div className="macroActivityHeader">
+                  <h4>Andamento da análise</h4>
+                  <span>{activeAnalysis ? statusLabels[activeAnalysis.status] : "Aguardando execução"}</span>
+                </div>
 
-            {activeAnalysis && (
-              <div className="progressBanner">
+              {activeAnalysis && (
+                <div className="progressBanner">
                 <div className="progressBannerHeader">
                   <strong>
                     {activeAnalysis.request.ticker} em {statusLabels[activeAnalysis.status]}
@@ -1338,11 +1290,11 @@ export default function Dashboard() {
                     </div>
                   ))}
                 </div>
-              </div>
-            )}
+                </div>
+              )}
 
-            {completedAnalyses.length > 0 && (
-              <label className="historySelect">
+              {completedAnalyses.length > 0 && (
+                <label className="historySelect">
                 <span>Execução concluída</span>
                 <select
                   value={selectedAnalysis?.id ?? completedAnalyses[0]?.id ?? ""}
@@ -1354,19 +1306,28 @@ export default function Dashboard() {
                     </option>
                   ))}
                 </select>
-              </label>
-            )}
+                </label>
+              )}
 
-            {!selectedAnalysis && !activeAnalysis && (
-              <EmptyState
+              {!selectedAnalysis && !activeAnalysis && (
+                <EmptyState
                 title="Nenhuma análise concluída ainda"
-                message="Execute uma análise multiagente pelo painel lateral para preencher o histórico."
+                message="Configure um cenário acima para iniciar a pesquisa multiagente."
                 icon={FileText}
-              />
-            )}
+                />
+              )}
+              </aside>
+            </div>
 
             {selectedAnalysis && (
-              <>
+              <section className="macroReportSection">
+                <div className="macroReportHeader">
+                  <div>
+                    <span>Relatório consolidado</span>
+                    <h4>{selectedAnalysis.request.ticker} · {selectedAnalysis.request.analysis_date}</h4>
+                  </div>
+                  <span className="macroReportStatus">{statusLabels[selectedAnalysis.status]}</span>
+                </div>
                 <div className="summaryStrip">
                   <span>{selectedAnalysis.request.provider}</span>
                   <span>{selectedAnalysis.request.quick_model}</span>
@@ -1385,23 +1346,9 @@ export default function Dashboard() {
                     {selectedAnalysis.status === "completed" ? "Relatório indisponível." : "A análise ainda está em execução."}
                   </p>
                 )}
-              </>
+              </section>
             )}
           </section>
-      ) : activeView === "backtest" ? (
-        <FeaturePlaceholder
-          icon={Activity}
-          title="Backtest e validação"
-          message="Módulo visual para validar setups antes de qualquer uso operacional futuro."
-          items={["Cenários históricos", "Métricas de drawdown", "Win rate simulado", "Comparação por timeframe"]}
-        />
-      ) : activeView === "alertas" ? (
-        <FeaturePlaceholder
-          icon={Bell}
-          title="Alertas inteligentes"
-          message="Centro para acompanhar gatilhos de preço, risco, volatilidade e mudanças de direção da IA."
-          items={["Alertas por ativo", "Mudança de setup", "Risco excedido", "Notificações futuras"]}
-        />
       ) : (
         <section className="detailPanel detailPanelFull">
           <div className="sectionTitle">
@@ -1410,47 +1357,46 @@ export default function Dashboard() {
           </div>
 
           <div className="brokerIntegrationGrid">
-            <form className="brokerConnectionPanel" onSubmit={connectMt5}>
+            <form autoComplete="off" className="brokerConnectionPanel" onSubmit={connectMt5}>
               <div className="controlPanelTitle">
                 <span>MetaTrader 5</span>
                 <strong>Conectar corretora</strong>
+                <small>Informe as credenciais da sua conta de negociação. Elas são diferentes do acesso ao Cortex.</small>
               </div>
 
-              <label>
-                Servidor
+              <label className="brokerField">
+                <span>Servidor</span>
                 <input
+                  autoComplete="off"
+                  name="mt5-broker-server"
                   placeholder="Ex.: Broker-Demo"
                   value={mt5Form.server}
                   onChange={(event) => setMt5Form({ ...mt5Form, server: event.target.value })}
                 />
+                <small>Use o nome exato exibido no seu terminal MT5.</small>
               </label>
 
-              <label>
-                Usuário / login
+              <label className="brokerField">
+                <span>Número da conta MT5</span>
                 <input
+                  autoComplete="off"
                   inputMode="numeric"
-                  placeholder="Número da conta MT5"
+                  name="mt5-account-number"
+                  placeholder="Ex.: 12345678"
                   value={mt5Form.login}
                   onChange={(event) => setMt5Form({ ...mt5Form, login: event.target.value })}
                 />
               </label>
 
-              <label>
-                Senha
+              <label className="brokerField">
+                <span>Senha da conta MT5</span>
                 <input
-                  autoComplete="current-password"
+                  autoComplete="new-password"
+                  name="mt5-trading-password"
+                  placeholder="Digite a senha da corretora"
                   type="password"
                   value={mt5Form.password}
                   onChange={(event) => setMt5Form({ ...mt5Form, password: event.target.value })}
-                />
-              </label>
-
-              <label>
-                Caminho do terminal MT5
-                <input
-                  placeholder="Opcional"
-                  value={mt5Form.terminal_path}
-                  onChange={(event) => setMt5Form({ ...mt5Form, terminal_path: event.target.value })}
                 />
               </label>
 
@@ -1461,57 +1407,37 @@ export default function Dashboard() {
                   {isMt5Loading ? <RefreshCw size={17} /> : <Network size={17} />}
                   {isMt5Loading ? "Conectando..." : "Conectar MT5"}
                 </button>
-                <button className="secondaryPanelAction" disabled={isMt5Loading || !mt5Status.connected} onClick={disconnectMt5} type="button">
-                  Desconectar
-                </button>
               </div>
             </form>
 
             <aside className="brokerStatusPanel">
-              <div className="panelHeader">
-                <Network size={18} />
+              <div className="brokerStatusHeader">
+                <div className={`brokerStatusIcon ${mt5Status.connected ? "brokerStatusIcon--connected" : ""}`}>
+                  <Network size={20} />
+                </div>
                 <div>
                   <h4>Status da corretora</h4>
-                  <span>{mt5Status.connected ? "Dados de mercado via MT5" : "Aguardando conexão"}</span>
+                  <span>{mt5Status.connected ? "Conexão estabelecida com o MetaTrader 5" : "Preencha os dados ao lado para iniciar a conexão"}</span>
                 </div>
-              </div>
-
-              <div className="opsStatusRows">
-                <span>
-                  Provider
-                  <strong>{marketDataProvider === "mt5" ? "MetaTrader 5" : "yFinance"}</strong>
-                </span>
-                <span>
-                  Conta
-                  <strong>{mt5Status.login ?? "-"}</strong>
-                </span>
-                <span>
-                  Servidor
-                  <strong>{mt5Status.server ?? "-"}</strong>
-                </span>
-                <span>
-                  Corretora
-                  <strong>{mt5Status.company ?? "-"}</strong>
-                </span>
-                <span>
-                  Saldo
-                  <strong>{typeof mt5Status.balance === "number" ? formatPrice(mt5Status.balance) : "-"}</strong>
-                </span>
-                <span>
-                  Execução real
-                  <strong>Bloqueada</strong>
+                <span className={`brokerConnectionBadge ${mt5Status.connected ? "brokerConnectionBadge--online" : ""}`}>
+                  {mt5Status.connected ? "Conectada" : "Não conectada"}
                 </span>
               </div>
 
-              <button
-                className="secondaryPanelAction"
-                disabled={!mt5Status.connected}
-                onClick={() => setMarketDataProvider(mt5Status.connected ? "mt5" : "yfinance")}
-                type="button"
-              >
-                Usar MT5 nos gráficos
-                <RefreshCw size={16} />
-              </button>
+              <div className="brokerStatusGrid">
+                <div className="brokerStatusItem"><HardDrive size={17} /><span>Fonte de dados</span><strong>{mt5Status.connected ? (marketDataProvider === "mt5" ? "MetaTrader 5" : "yFinance") : ""}</strong></div>
+                <div className="brokerStatusItem"><UserRound size={17} /><span>Conta</span><strong>{mt5Status.connected ? mt5Status.login ?? "" : ""}</strong></div>
+                <div className="brokerStatusItem"><Server size={17} /><span>Servidor</span><strong>{mt5Status.connected ? mt5Status.server ?? "" : ""}</strong></div>
+                <div className="brokerStatusItem"><Building2 size={17} /><span>Corretora</span><strong>{mt5Status.connected ? mt5Status.company ?? "" : ""}</strong></div>
+                <div className="brokerStatusItem"><Wallet size={17} /><span>Saldo disponível</span><strong>{mt5Status.connected && typeof mt5Status.balance === "number" ? formatPrice(mt5Status.balance) : ""}</strong></div>
+                <div className="brokerStatusItem brokerStatusItem--safe"><LockKeyhole size={17} /><span>Execução de ordens</span><strong>{mt5Status.connected ? "Bloqueada por segurança" : ""}</strong></div>
+              </div>
+
+              <div className="brokerStatusFooter">
+                <button className="secondaryPanelAction brokerDisconnectAction" disabled={isMt5Loading || !mt5Status.connected} onClick={disconnectMt5} type="button">
+                  Desconectar
+                </button>
+              </div>
             </aside>
           </div>
         </section>

@@ -28,7 +28,7 @@ def test_opportunity_endpoint_returns_structured_signal(monkeypatch):
     assert body["request"]["symbol"] == "SPY"
     assert body["signals"]
     assert body["signals"][0]["direction"] in {"BUY", "SELL", "WAIT", "AVOID"}
-    assert "No real order execution" in " ".join(body["signals"][0]["warnings"])
+    assert "não executa ordens reais" in " ".join(body["signals"][0]["warnings"])
 
 
 @pytest.mark.unit

@@ -13,23 +13,23 @@ def trend_following_candidate(snapshot: TechnicalSnapshot) -> SetupCandidate:
     if snapshot.trend == "bullish":
         direction = Direction.BUY
         score += 0.25
-        reasons.append("Fast moving average is above slow average and price is aligned with bullish trend.")
+        reasons.append("A média móvel rápida está acima da lenta e o preço está alinhado à tendência de alta.")
     elif snapshot.trend == "bearish":
         direction = Direction.SELL
         score += 0.25
-        reasons.append("Fast moving average is below slow average and price is aligned with bearish trend.")
+        reasons.append("A média móvel rápida está abaixo da lenta e o preço está alinhado à tendência de baixa.")
     else:
-        reasons.append("Trend is sideways, reducing directional edge.")
+        reasons.append("A tendência está lateral, reduzindo a vantagem direcional.")
 
     if direction == Direction.BUY and snapshot.macd > snapshot.macd_signal:
         score += 0.15
-        reasons.append("MACD is above signal line.")
+        reasons.append("O MACD está acima da linha de sinal.")
     elif direction == Direction.SELL and snapshot.macd < snapshot.macd_signal:
         score += 0.15
-        reasons.append("MACD is below signal line.")
+        reasons.append("O MACD está abaixo da linha de sinal.")
 
     if 40 <= snapshot.rsi <= 68:
         score += 0.1
-        reasons.append("RSI is not stretched for trend continuation.")
+        reasons.append("O RSI não está estendido e favorece a continuidade da tendência.")
 
     return SetupCandidate(name="trend_following", direction=direction, score=min(score, 1), technical_reasons=reasons)

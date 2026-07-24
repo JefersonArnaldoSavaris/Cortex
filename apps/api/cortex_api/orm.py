@@ -11,7 +11,7 @@ class Base(DeclarativeBase):
 
 
 class UserORM(Base):
-    __tablename__ = "users"
+    __tablename__ = "usuarios"
 
     id: Mapped[str] = mapped_column(Text, primary_key=True)
     name: Mapped[str] = mapped_column(Text, nullable=False)
@@ -31,10 +31,10 @@ class UserORM(Base):
 
 
 class BrokerConnectionORM(Base):
-    __tablename__ = "broker_connections"
+    __tablename__ = "conexoes_corretora"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    user_id: Mapped[str] = mapped_column(Text, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, unique=True, index=True)
+    user_id: Mapped[str] = mapped_column(Text, ForeignKey("usuarios.id", ondelete="CASCADE"), nullable=False, unique=True, index=True)
     provider: Mapped[str] = mapped_column(Text, nullable=False, default="mt5")
     login: Mapped[int] = mapped_column(Integer, nullable=False)
     server: Mapped[str] = mapped_column(Text, nullable=False)
@@ -58,7 +58,7 @@ class BrokerConnectionORM(Base):
 
 
 class AnalysisORM(Base):
-    __tablename__ = "analyses"
+    __tablename__ = "analises"
 
     id: Mapped[str] = mapped_column(Text, primary_key=True)
     ticker: Mapped[str] = mapped_column(Text, nullable=False)
@@ -87,10 +87,10 @@ class AnalysisORM(Base):
 
 
 class AnalysisEventORM(Base):
-    __tablename__ = "analysis_events"
+    __tablename__ = "eventos_analise"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    analysis_id: Mapped[str] = mapped_column(Text, ForeignKey("analyses.id", ondelete="CASCADE"), nullable=False)
+    analysis_id: Mapped[str] = mapped_column(Text, ForeignKey("analises.id", ondelete="CASCADE"), nullable=False)
     timestamp: Mapped[datetime] = mapped_column(DateTime, nullable=False, default=datetime.now)
     level: Mapped[str] = mapped_column(Text, nullable=False, default="info")
     message: Mapped[str] = mapped_column(Text, nullable=False)

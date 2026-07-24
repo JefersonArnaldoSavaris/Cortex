@@ -186,12 +186,12 @@ ASSET_OPTIONS = [
 ]
 
 SUPPORTED_HISTORY_PERIODS: dict[str, list[str]] = {
-    "1m": ["1d"],
-    "5m": ["1d", "5d"],
-    "15m": ["1d", "5d", "1mo"],
-    "1h": ["5d", "1mo", "3mo"],
-    "4h": ["1mo", "3mo", "6mo"],
-    "1d": ["1mo", "3mo", "6mo", "1y"],
+    "1m": ["1d", "7d"],
+    "5m": ["1d", "5d", "60d"],
+    "15m": ["1d", "5d", "1mo", "60d"],
+    "1h": ["5d", "1mo", "3mo", "2y"],
+    "4h": ["1mo", "3mo", "6mo", "2y"],
+    "1d": ["1mo", "3mo", "6mo", "1y", "max"],
 }
 
 FETCH_INTERVALS: dict[str, str] = {
@@ -271,7 +271,18 @@ def get_asset_history(
             "4h": Timeframe.H4,
             "1d": Timeframe.D1,
         }[normalized_interval]
-        period_days = {"1d": 1, "5d": 5, "1mo": 31, "3mo": 93, "6mo": 186, "1y": 366}[normalized_period]
+        period_days = {
+            "1d": 1,
+            "5d": 5,
+            "7d": 7,
+            "1mo": 31,
+            "60d": 60,
+            "3mo": 93,
+            "6mo": 186,
+            "1y": 366,
+            "2y": 732,
+            "max": 36_500,
+        }[normalized_period]
         bars_per_day = {"1m": 1440, "5m": 288, "15m": 96, "1h": 24, "4h": 6, "1d": 1}[normalized_interval]
         limit = min(max(period_days * bars_per_day, 50), 5000)
         bars = mt5_provider.get_ohlcv(symbol, timeframe, limit)

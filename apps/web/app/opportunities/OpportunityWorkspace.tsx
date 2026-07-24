@@ -3,17 +3,16 @@
 import {
   Activity,
   AlertTriangle,
-  Bot,
   Cable,
   Clock3,
   Loader2,
   RadioTower,
+  Search,
   ShieldAlert,
-  SlidersHorizontal,
   Sparkles,
   Target,
 } from "lucide-react";
-import type { Dispatch, FormEvent, ReactNode, SetStateAction } from "react";
+import { useEffect, useMemo, useState, type Dispatch, type FormEvent, type KeyboardEvent, type ReactNode, type SetStateAction } from "react";
 
 import type {
   OpportunityDirection,
@@ -43,6 +42,24 @@ const directionLabels: Record<OpportunityDirection, string> = {
   AVOID: "Evitar",
 };
 
+const directionBadgeLabels: Record<OpportunityDirection, string> = {
+  BUY: "COMPRA",
+  SELL: "VENDA",
+  WAIT: "AGUARDAR",
+  AVOID: "EVITAR",
+};
+
+const setupLabels: Record<string, string> = {
+  breakout: "Rompimento",
+  pullback: "Pullback",
+  trend_following: "Seguimento de tendência",
+  mean_reversion: "Reversão à média",
+  avoid_low_quality_market: "Evitar mercado de baixa qualidade",
+  evitar_mercado_de_baixa_qualidade: "Evitar mercado de baixa qualidade",
+  no_setup: "Sem setup",
+  sem_setup: "Sem setup",
+};
+
 const directionTone: Record<OpportunityDirection, string> = {
   BUY: "buy",
   SELL: "sell",
@@ -60,6 +77,14 @@ type OpportunityWorkspaceProps = {
   onSubmit: (event: FormEvent<HTMLFormElement>) => void;
   formatPrice: (value: number) => string;
   chartSlot: ReactNode;
+  marketSummary: {
+    name: string;
+    latest: number;
+    min: number;
+    max: number;
+    change: number;
+    changePct: number;
+  } | null;
 };
 
 export function OpportunityWorkspace({
@@ -72,73 +97,78 @@ export function OpportunityWorkspace({
   onSubmit,
   formatPrice,
   chartSlot,
+  marketSummary,
 }: OpportunityWorkspaceProps) {
   const primarySignal = result?.signals[0] ?? null;
-  const isMt5Selected = form.provider === "mt5";
 
   return (
     <section className="opportunityWorkspace">
-      <OpportunityHeader provider={form.provider} isMt5Selected={isMt5Selected} />
-
       <div className="opportunityShell opportunityShell--horizontal">
         <TradingConfigPanel assets={assets} form={form} setForm={setForm} isLoading={isLoading} onSubmit={onSubmit} />
-        <div className="opportunityChartStage">{chartSlot}</div>
-        <div className="opportunityAnalysisStage">
-          <div className="opportunityStageHeader">
-            <Target size={18} />
-            <div>
-              <h4>Decisão da IA e fundamentos</h4>
-              <span>Leitura operacional, níveis de risco e critérios técnicos consolidados</span>
-            </div>
-          </div>
+        <div className="microSummaryGrid">
+          <MarketSummaryCard summary={marketSummary} formatPrice={formatPrice} />
           <OpportunityDecisionCard
             signal={primarySignal}
             isLoading={isLoading}
             error={error}
-            formatPrice={formatPrice}
           />
-          <ContextPanel
+          <OperationalMetricsCard signal={primarySignal} formatPrice={formatPrice} />
+          <OperationalStatusCard
             signal={primarySignal}
-            result={result}
             provider={form.provider}
             error={error}
             isLoading={isLoading}
           />
+        </div>
+        <div className="microMainGrid">
+          <div className="opportunityChartStage">{chartSlot}</div>
+          <aside className="microInsightsPanel">
+            <div className="microInsightsHeader">
+              <Target size={17} />
+              <h4>Análise da IA</h4>
+            </div>
+          <ContextPanel
+            signal={primarySignal}
+            result={result}
+          />
+          </aside>
         </div>
       </div>
     </section>
   );
 }
 
-function OpportunityHeader({ provider, isMt5Selected }: { provider: OpportunityProvider; isMt5Selected: boolean }) {
+function MarketSummaryCard({
+  summary,
+  formatPrice,
+}: {
+  summary: OpportunityWorkspaceProps["marketSummary"];
+  formatPrice: (value: number) => string;
+}) {
+  if (!summary) {
+    return (
+      <section className="marketSummaryCard marketSummaryCard--empty">
+        <span>Resumo do ativo</span>
+        <strong>Aguardando dados de mercado</strong>
+      </section>
+    );
+  }
+  const isPositive = summary.change >= 0;
   return (
-    <header className="opportunityHero">
-      <div>
-        <p className="eyebrow">Cortex AI Trading Desk</p>
-        <div className="opportunityHeroTitle">
-          <h3>Trading Opportunities</h3>
-          <span className="modeBadge">Sem execução real</span>
-        </div>
-        <p>
-          IA para leitura de cenários operacionais de Day Trade e Swing Trade, com foco em contexto técnico,
-          risco e validação humana.
-        </p>
+    <section className="marketSummaryCard">
+      <div className="marketSummaryTitle">
+        <h4>{summary.name}</h4>
+        <span className="liveStreamBadge liveStreamBadge--live"><i /> Tempo real</span>
       </div>
-      <div className="opportunityHeroStatus">
-        <span>
-          <Bot size={16} />
-          Modo análise
-        </span>
-        <span className={isMt5Selected ? "statusPill statusPill--warning" : "statusPill"}>
-          <Cable size={16} />
-          {isMt5Selected ? "MT5 / Corretora" : `Provider ${provider}`}
-        </span>
-        <span className="riskPill">
-          <ShieldAlert size={16} />
-          Não é recomendação financeira
-        </span>
+      <strong className="marketSummaryPrice">{formatPrice(summary.latest)}</strong>
+      <span className={isPositive ? "marketSummaryChange positive" : "marketSummaryChange negative"}>
+        {isPositive ? "+" : ""}{formatPrice(summary.change)} ({isPositive ? "+" : ""}{summary.changePct.toFixed(2)}%)
+      </span>
+      <div className="marketSummaryStats">
+        <span>Máx.<strong>{formatPrice(summary.max)}</strong></span>
+        <span>Mín.<strong>{formatPrice(summary.min)}</strong></span>
       </div>
-    </header>
+    </section>
   );
 }
 
@@ -157,28 +187,12 @@ function TradingConfigPanel({
 }) {
   return (
     <aside className="tradingConfigPanel">
-      <div className="panelHeader">
-        <SlidersHorizontal size={18} />
-        <div>
-          <h4>Configuração operacional</h4>
-          <span>Parâmetros da simulação técnica</span>
-        </div>
-      </div>
-
       <form className="tradingConfigForm" onSubmit={onSubmit}>
-        <label className="configField configField--asset">
-          Ativo / símbolo
-          <select
-            value={form.symbol}
-            onChange={(event) => setForm({ ...form, symbol: event.target.value })}
-          >
-            {assets.map((asset) => (
-              <option key={asset.symbol} value={asset.symbol}>
-                {asset.symbol} · {asset.name} ({asset.category})
-              </option>
-            ))}
-          </select>
-        </label>
+        <AssetCombobox
+          assets={assets}
+          value={form.symbol}
+          onChange={(symbol) => setForm({ ...form, symbol })}
+        />
 
         <label className="configField">
           Tipo de operação
@@ -217,74 +231,127 @@ function TradingConfigPanel({
           </select>
         </label>
 
-        <div className="configSplit">
-          <label>
-            Capital
-            <input
-              min={1}
-              step={100}
-              type="number"
-              value={form.capital}
-              onChange={(event) => setForm({ ...form, capital: Number(event.target.value) })}
-            />
-          </label>
-
-          <label>
-            Risco/operação
-            <input
-              max={1}
-              min={0.001}
-              step={0.001}
-              type="number"
-              value={form.max_risk_per_trade}
-              onChange={(event) => setForm({ ...form, max_risk_per_trade: Number(event.target.value) })}
-            />
-          </label>
-        </div>
-
-        <label className="configField configField--provider">
-          Provider de dados
-          <select
-            value={form.provider}
-            onChange={(event) => setForm({ ...form, provider: event.target.value as OpportunityProvider })}
-          >
-            <option value="mock">Mock / Preview</option>
-            <option value="yfinance">yFinance</option>
-            <option value="mt5">MT5 / Corretora</option>
-          </select>
-          {form.provider === "mt5" ? <small>Ativos e candles fornecidos diretamente pelo servidor da corretora.</small> : null}
-        </label>
-
-        <div className="configSplit">
-          <label>
-            Máx. sinais
-            <input
-              max={20}
-              min={1}
-              type="number"
-              value={form.max_signals}
-              onChange={(event) => setForm({ ...form, max_signals: Number(event.target.value) })}
-            />
-          </label>
-
-          <label>
-            Barras OHLCV
-            <input
-              max={1000}
-              min={50}
-              type="number"
-              value={form.limit}
-              onChange={(event) => setForm({ ...form, limit: Number(event.target.value) })}
-            />
-          </label>
-        </div>
-
         <button className="tradeActionButton tradingConfigSubmit" disabled={isLoading} type="submit">
           {isLoading ? <Loader2 size={17} /> : <Sparkles size={17} />}
-          {isLoading ? "Analisando..." : "Analisar oportunidade"}
+          {isLoading ? "Analisando..." : "Analisar ativo"}
         </button>
       </form>
     </aside>
+  );
+}
+
+function AssetCombobox({
+  assets,
+  value,
+  onChange,
+}: {
+  assets: Array<{ symbol: string; name: string; category: string }>;
+  value: string;
+  onChange: (symbol: string) => void;
+}) {
+  const selectedAsset = assets.find((asset) => asset.symbol === value);
+  const selectedLabel = selectedAsset ? `${selectedAsset.symbol} · ${selectedAsset.name}` : value;
+  const [query, setQuery] = useState(selectedLabel);
+  const [isOpen, setIsOpen] = useState(false);
+  const [activeIndex, setActiveIndex] = useState(0);
+
+  useEffect(() => {
+    setQuery(selectedLabel);
+  }, [selectedLabel]);
+
+  const filteredAssets = useMemo(() => {
+    const normalizedQuery = query.trim().toLocaleLowerCase("pt-BR");
+    if (!normalizedQuery || query === selectedLabel) {
+      return assets.slice(0, 80);
+    }
+    return assets
+      .filter((asset) =>
+        `${asset.symbol} ${asset.name} ${asset.category}`.toLocaleLowerCase("pt-BR").includes(normalizedQuery),
+      )
+      .slice(0, 80);
+  }, [assets, query, selectedLabel]);
+
+  function selectAsset(asset: { symbol: string; name: string }) {
+    onChange(asset.symbol);
+    setQuery(`${asset.symbol} · ${asset.name}`);
+    setIsOpen(false);
+  }
+
+  function handleKeyDown(event: KeyboardEvent<HTMLInputElement>) {
+    if (event.key === "ArrowDown") {
+      event.preventDefault();
+      setIsOpen(true);
+      setActiveIndex((current) => Math.min(current + 1, Math.max(filteredAssets.length - 1, 0)));
+    } else if (event.key === "ArrowUp") {
+      event.preventDefault();
+      setActiveIndex((current) => Math.max(current - 1, 0));
+    } else if (event.key === "Enter" && isOpen && filteredAssets[activeIndex]) {
+      event.preventDefault();
+      selectAsset(filteredAssets[activeIndex]);
+    } else if (event.key === "Escape") {
+      setQuery(selectedLabel);
+      setIsOpen(false);
+    }
+  }
+
+  return (
+    <div className="fieldGroup configField assetCombobox">
+      <label htmlFor="asset-search">Ativo / símbolo</label>
+      <span className="assetComboboxControl">
+        <Search aria-hidden="true" size={16} />
+        <input
+          id="asset-search"
+          aria-autocomplete="list"
+          aria-controls="asset-options"
+          aria-expanded={isOpen}
+          autoComplete="off"
+          onBlur={() => {
+            window.setTimeout(() => {
+              setQuery(selectedLabel);
+              setIsOpen(false);
+            }, 120);
+          }}
+          onChange={(event) => {
+            setQuery(event.target.value);
+            setActiveIndex(0);
+            setIsOpen(true);
+          }}
+          onFocus={() => {
+            setQuery("");
+            setActiveIndex(0);
+            setIsOpen(true);
+          }}
+          onKeyDown={handleKeyDown}
+          placeholder="Pesquise por símbolo ou nome"
+          role="combobox"
+          value={query}
+        />
+      </span>
+      {isOpen ? (
+        <div className="assetComboboxMenu" id="asset-options" role="listbox">
+          {filteredAssets.length > 0 ? (
+            filteredAssets.map((asset, index) => (
+              <button
+                aria-selected={asset.symbol === value}
+                className={index === activeIndex ? "assetComboboxOption assetComboboxOption--active" : "assetComboboxOption"}
+                key={asset.symbol}
+                onMouseDown={(event) => event.preventDefault()}
+                onMouseEnter={() => setActiveIndex(index)}
+                onClick={() => selectAsset(asset)}
+                role="option"
+                type="button"
+              >
+                <strong>{asset.symbol}</strong>
+                <span>{asset.name}</span>
+                <em>{asset.category}</em>
+              </button>
+            ))
+          ) : (
+            <span className="assetComboboxEmpty">Nenhum ativo encontrado</span>
+          )}
+        </div>
+      ) : null}
+    </div>
   );
 }
 
@@ -292,12 +359,10 @@ function OpportunityDecisionCard({
   signal,
   isLoading,
   error,
-  formatPrice,
 }: {
   signal: OpportunitySignal | null;
   isLoading: boolean;
   error: string | null;
-  formatPrice: (value: number) => string;
 }) {
   if (isLoading) {
     return (
@@ -332,13 +397,13 @@ function OpportunityDecisionCard({
   return (
     <section className={`decisionCard decisionCard--${tone}`}>
       <div className="decisionTopline">
-        <span className={`decisionBadge decisionBadge--${tone}`}>{signal.direction}</span>
+        <span className={`decisionBadge decisionBadge--${tone}`}>{directionBadgeLabels[signal.direction]}</span>
         <span>{directionLabels[signal.direction]}</span>
       </div>
 
       <div className="decisionTitle">
         <h4>Decisão da IA</h4>
-        <strong>{signal.setup_name.replaceAll("_", " ")}</strong>
+        <strong>{setupLabels[signal.setup_name] ?? signal.setup_name.replaceAll("_", " ")}</strong>
       </div>
 
       <div className="confidenceBlock">
@@ -351,13 +416,50 @@ function OpportunityDecisionCard({
         </div>
       </div>
 
+    </section>
+  );
+}
+
+function OperationalMetricsCard({
+  signal,
+  formatPrice,
+}: {
+  signal: OpportunitySignal | null;
+  formatPrice: (value: number) => string;
+}) {
+  return (
+    <section className="operationalMetricsCard">
       <div className="metricMatrix">
-        <RiskMetricCard label="Entrada" value={signal.entry_price ? formatPrice(signal.entry_price) : "-"} />
-        <RiskMetricCard label="Stop loss" value={signal.stop_loss ? formatPrice(signal.stop_loss) : "-"} tone="danger" />
-        <RiskMetricCard label="Take profit" value={signal.take_profit ? formatPrice(signal.take_profit) : "-"} tone="success" />
-        <RiskMetricCard label="Risco/retorno" value={signal.risk_reward_ratio?.toString() ?? "-"} />
-        <RiskMetricCard label="Posição sugerida" value={formatPrice(signal.position_size)} />
-        <RiskMetricCard label="Perda máxima" value={formatPrice(signal.max_loss)} tone="warning" />
+        <RiskMetricCard label="Entrada" value={signal?.entry_price ? formatPrice(signal.entry_price) : "-"} />
+        <RiskMetricCard label="Stop loss" value={signal?.stop_loss ? formatPrice(signal.stop_loss) : "-"} tone="danger" />
+        <RiskMetricCard label="Take profit" value={signal?.take_profit ? formatPrice(signal.take_profit) : "-"} tone="success" />
+        <RiskMetricCard label="Risco/retorno" value={signal?.risk_reward_ratio?.toString() ?? "-"} />
+        <RiskMetricCard label="Posição sugerida" value={signal ? formatPrice(signal.position_size) : "-"} />
+        <RiskMetricCard label="Perda máxima" value={signal ? formatPrice(signal.max_loss) : "-"} tone="warning" />
+      </div>
+    </section>
+  );
+}
+
+function OperationalStatusCard({
+  signal,
+  provider,
+  error,
+  isLoading,
+}: {
+  signal: OpportunitySignal | null;
+  provider: OpportunityProvider;
+  error: string | null;
+  isLoading: boolean;
+}) {
+  const providerStatus = getProviderStatus(provider, error);
+  return (
+    <section className="operationalStatusCard">
+      <h4>Status operacional</h4>
+      <div className="opsStatusRows">
+        <span><Cable size={15} />Provedor<strong>{providerStatus}</strong></span>
+        <span><Clock3 size={15} />Data e hora<strong>{signal ? new Date(signal.generated_at).toLocaleString("pt-BR") : isLoading ? "Processando" : "Aguardando"}</strong></span>
+        <span><ShieldAlert size={15} />Execução real<strong>Bloqueada</strong></span>
       </div>
     </section>
   );
@@ -430,45 +532,17 @@ function MarketPreviewCard({
 function ContextPanel({
   signal,
   result,
-  provider,
-  error,
-  isLoading,
 }: {
   signal: OpportunitySignal | null;
   result: OpportunityResult | null;
-  provider: OpportunityProvider;
-  error: string | null;
-  isLoading: boolean;
 }) {
-  const providerStatus = getProviderStatus(provider, error);
-
   return (
     <section className="contextPanel">
       <AnalysisReasonList title="Razões técnicas" items={signal?.technical_reasons ?? []} emptyText="Aguardando leitura técnica." />
       <AnalysisReasonList title="Razões de risco" items={signal?.risk_reasons ?? []} emptyText="Aguardando avaliação de risco." />
       <AnalysisReasonList title="Invalidação" items={signal?.invalidation_criteria ?? []} emptyText="Sem critérios definidos ainda." />
-      <AnalysisReasonList title="Warnings" items={[...(signal?.warnings ?? []), ...(result?.warnings ?? [])]} emptyText="Sem alertas adicionais." />
+      <AnalysisReasonList title="Alertas" items={[...(signal?.warnings ?? []), ...(result?.warnings ?? [])]} emptyText="Sem alertas adicionais." />
 
-      <div className="opsStatusCard">
-        <h4>Status operacional</h4>
-        <div className="opsStatusRows">
-          <span>
-            <Cable size={15} />
-            Provider
-            <strong>{providerStatus}</strong>
-          </span>
-          <span>
-            <Clock3 size={15} />
-            Timestamp
-            <strong>{signal ? new Date(signal.generated_at).toLocaleString("pt-BR") : isLoading ? "Processando" : "Aguardando"}</strong>
-          </span>
-          <span>
-            <ShieldAlert size={15} />
-            Execução real
-            <strong>Bloqueada</strong>
-          </span>
-        </div>
-      </div>
     </section>
   );
 }

@@ -560,8 +560,8 @@ label,
 
 .mockupContent {
   display: grid;
-  grid-gap: 12px;
-  gap: 12px;
+  grid-gap: 9px;
+  gap: 9px;
   padding: 14px;
 }
 
@@ -842,15 +842,15 @@ label,
 }
 
 .authCardPanel {
-  align-self: center;
+  align-self: start;
   background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0.026)),
-    rgba(7, 14, 29, 0.86);
+    linear-gradient(180deg, rgba(255, 255, 255, 0.035), transparent),
+    rgba(7, 14, 29, 0.92);
   display: grid;
-  grid-gap: 18px;
-  gap: 18px;
+  grid-gap: 12px;
+  gap: 12px;
   overflow: hidden;
-  padding: 28px;
+  padding: 16px;
 }
 
 .authCardGlow {
@@ -874,21 +874,21 @@ label,
 .authModeTabs--premium {
   background: rgba(2, 6, 23, 0.52);
   border-color: rgba(148, 163, 184, 0.18);
-  min-height: 58px;
-  padding: 7px;
+  min-height: 46px;
+  padding: 5px;
 }
 
 .authModeTabs--premium button.active {
   background:
-    linear-gradient(180deg, rgba(15, 23, 42, 0.94), rgba(15, 23, 42, 0.66)),
-    rgba(15, 23, 42, 0.86);
+    linear-gradient(100deg, rgba(109, 40, 217, 0.82), rgba(126, 34, 206, 0.62)),
+    rgba(76, 29, 149, 0.82);
   box-shadow:
-    inset 0 -2px 0 #a855f7,
-    inset 0 0 0 1px rgba(103, 232, 249, 0.18);
+    inset 0 0 0 1px rgba(192, 132, 252, 0.5),
+    0 8px 26px rgba(126, 34, 206, 0.2);
 }
 
 .authForm--premium {
-  gap: 16px;
+  gap: 9px;
 }
 
 .authTitle--premium {
@@ -903,13 +903,13 @@ label,
   border-radius: 8px;
   color: #67e8f9;
   display: inline-flex;
-  height: 44px;
+  height: 36px;
   justify-content: center;
-  width: 44px;
+  width: 36px;
 }
 
 .authTitle--premium h2 {
-  font-size: 28px;
+  font-size: 23px;
   letter-spacing: 0;
 }
 
@@ -930,7 +930,7 @@ label,
   grid-gap: 8px;
   gap: 8px;
   grid-template-columns: 20px minmax(0, 1fr);
-  min-height: 56px;
+  min-height: 44px;
   opacity: 0.82;
   padding: 0 12px;
   position: relative;
@@ -980,7 +980,7 @@ label,
   color: #8fb3c9;
   display: grid;
   grid-template-columns: 20px minmax(0, 1fr);
-  min-height: 54px;
+  min-height: 44px;
   padding: 0 13px;
   transition:
     border-color 160ms ease,
@@ -998,8 +998,23 @@ label,
   background: transparent;
   border: 0;
   box-shadow: none;
-  min-height: 52px;
+  min-height: 42px;
   padding: 0 0 0 8px;
+}
+
+.authFieldControl input::placeholder {
+  color: #718096;
+  opacity: 1;
+}
+
+.authFieldControl input:-webkit-autofill,
+.authFieldControl input:-webkit-autofill:hover,
+.authFieldControl input:-webkit-autofill:focus,
+.authFieldControl input:-webkit-autofill:active {
+  -webkit-text-fill-color: var(--text);
+  caret-color: var(--text);
+  box-shadow: 0 0 0 1000px #07101f inset !important;
+  transition: background-color 9999s ease-out 0s;
 }
 
 .authFieldControl--password {
@@ -1053,7 +1068,7 @@ label,
   font-weight: 950;
   gap: 9px;
   justify-content: center;
-  min-height: 58px;
+  min-height: 46px;
   position: relative;
   transition:
     opacity 160ms ease,
@@ -1086,7 +1101,7 @@ label,
   border: 1px solid rgba(148, 163, 184, 0.18);
   border-radius: 8px;
   gap: 10px;
-  padding: 12px;
+  padding: 9px 10px;
 }
 
 .securityBadge svg {
@@ -1094,9 +1109,9 @@ label,
   border-radius: 8px;
   color: #a78bfa;
   flex: 0 0 auto;
-  height: 42px;
-  padding: 10px;
-  width: 42px;
+  height: 36px;
+  padding: 8px;
+  width: 36px;
 }
 
 .securityBadge strong {
@@ -1154,38 +1169,147 @@ label,
 }
 
 .authShell--premium {
+  align-content: start;
+  display: grid;
+  gap: 18px;
+  grid-template-columns: 1fr;
+  grid-template-rows: auto auto auto;
+  overflow-x: hidden;
+  overflow-y: auto;
+  padding: 20px 34px;
+}
+
+.authPublicHeader {
+  align-items: center;
+  display: flex;
+  justify-content: space-between;
+  min-height: 56px;
+  position: relative;
+  z-index: 3;
+}
+
+.authPublicHeader nav {
+  align-items: center;
+  display: flex;
+  gap: clamp(20px, 3vw, 42px);
+}
+
+.authPublicHeader nav a {
+  color: #cbd5e1;
+  font-size: 14px;
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.authPublicHeader nav a:hover {
+  color: white;
+}
+
+.authPublicHeader nav button {
+  background: rgba(7, 14, 29, 0.58);
+  border: 1px solid #8b5cf6;
+  border-radius: 8px;
+  color: white;
+  font-weight: 850;
+  min-height: 44px;
+  padding: 0 24px;
+}
+
+.authHomeGrid {
+  align-items: start;
+  display: grid;
   gap: 30px;
-  grid-template-columns: minmax(760px, 1fr) minmax(430px, 540px);
-  padding: 34px;
+  grid-template-columns: minmax(0, 1fr) minmax(420px, 32.8vw);
+  min-width: 0;
 }
 
 .authMarketingPanel {
-  background:
-    radial-gradient(circle at 70% 55%, rgba(124, 58, 237, 0.28), transparent 22rem),
-    radial-gradient(circle at 48% 96%, rgba(124, 58, 237, 0.32), transparent 18rem),
-    radial-gradient(circle at 12% 12%, rgba(34, 211, 238, 0.08), transparent 20rem),
-    linear-gradient(135deg, rgba(5, 9, 22, 0.98), rgba(8, 10, 28, 0.94));
+  background: transparent;
   border: 0;
   box-shadow: none;
   display: grid;
-  grid-gap: 22px 40px;
-  gap: 22px 40px;
-  grid-template-columns: minmax(330px, 420px) minmax(330px, 1fr);
-  grid-template-rows: auto auto auto minmax(0, 1fr) auto;
+  gap: 22px;
+  grid-template-columns: 1fr;
+  grid-template-rows: auto auto auto;
   overflow: visible;
   padding: 4px 0 0;
 }
 
-.authMarketingPanel::after {
+.authMarketStrip {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  position: relative;
+  z-index: 2;
+}
+
+.authMarketCard {
+  align-items: end;
   background:
-    linear-gradient(90deg, rgba(124, 58, 237, 0), rgba(124, 58, 237, 0.5), rgba(34, 211, 238, 0)),
-    linear-gradient(180deg, transparent, rgba(124, 58, 237, 0.22));
-  bottom: 0;
-  height: 34%;
-  left: 0;
-  opacity: 0.42;
-  right: 0;
-  top: auto;
+    linear-gradient(180deg, rgba(255, 255, 255, 0.035), transparent),
+    rgba(8, 16, 32, 0.88);
+  border: 1px solid rgba(148, 163, 184, 0.2);
+  border-radius: 8px;
+  display: grid;
+  gap: 10px;
+  grid-template-columns: minmax(0, 0.9fr) minmax(80px, 1.1fr);
+  min-height: 110px;
+  padding: 14px 16px;
+}
+
+.authMarketCard div {
+  display: grid;
+  gap: 3px;
+}
+
+.authMarketCard strong {
+  font-size: 14px;
+}
+
+.authMarketCard span {
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.authMarketCard b {
+  font-size: 15px;
+  margin-top: 5px;
+}
+
+.authMarketCard em {
+  font-size: 12px;
+  font-style: normal;
+  font-weight: 850;
+}
+
+.authMarketCard svg {
+  height: 48px;
+  overflow: visible;
+  width: 100%;
+}
+
+.authMarketCard path {
+  fill: none;
+  stroke-linecap: round;
+  stroke-width: 1.5;
+}
+
+.authMarketCard--up em {
+  color: #34d399;
+}
+
+.authMarketCard--up path {
+  stroke: #22d3ee;
+}
+
+.authMarketCard--down em,
+.authMarketCard--down path {
+  color: #fb7185;
+  stroke: #f43f5e;
+}
+
+.authMarketingPanel::after {
+  display: none;
 }
 
 .authMarketingPanel::before {
@@ -1210,57 +1334,101 @@ label,
 }
 
 .authMarketingCopy {
-  grid-column: 1 / 2;
-  max-width: 420px;
-  padding-top: 28px;
+  grid-column: 1;
+  max-width: 850px;
+  padding-top: 10px;
 }
 
 .authMarketingCopy h1 {
-  font-size: clamp(42px, 4vw, 60px);
-  line-height: 1.08;
+  font-size: clamp(42px, 3.65vw, 58px);
+  line-height: 1.14;
   margin: 12px 0 18px;
+  max-width: 850px;
 }
 
 .authMarketingCopy h1 span {
   color: #a855f7;
+  display: inline;
 }
 
 .authMarketingCopy p:not(.eyebrow) {
   color: #d4d9e6;
-  font-size: 17px;
-  line-height: 1.5;
+  font-size: 18px;
+  line-height: 1.6;
+  max-width: 680px;
 }
 
 .authBenefitGrid {
   align-self: start;
-  grid-column: 1 / 2;
-  grid-template-columns: 1fr;
+  grid-column: 1;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
 }
 
 .authBenefitCard {
-  align-items: center;
+  align-content: start;
   background: rgba(15, 23, 42, 0.62);
   border-color: rgba(148, 163, 184, 0.2);
-  min-height: 92px;
-  padding: 14px 16px;
+  display: grid;
+  grid-template-columns: 1fr;
+  min-height: 225px;
+  padding: 18px 20px;
 }
 
-.authBenefitCard:nth-child(1) svg {
+.authBenefitCard strong,
+.authBenefitCard span {
+  grid-column: 1;
+}
+
+.authBenefitCard strong {
+  font-size: 16px;
+  margin-top: 8px;
+}
+
+.authBenefitCard span {
+  font-size: 14px;
+  line-height: 1.55;
+}
+
+.authBenefitArrow {
+  align-self: end;
+  border: 1px solid currentColor;
+  border-radius: 999px;
+  color: #a855f7;
+  height: 36px !important;
+  justify-self: end;
+  margin-top: auto;
+  padding: 8px !important;
+  width: 36px !important;
+}
+
+.authBenefitCard:nth-child(2) .authBenefitArrow {
+  color: #22d3ee;
+}
+
+.authBenefitCard:nth-child(3) .authBenefitArrow {
+  color: #f59e0b;
+}
+
+.authBenefitCard:nth-child(4) .authBenefitArrow {
+  color: #3b82f6;
+}
+
+.authBenefitCard:nth-child(1) > svg:not(.authBenefitArrow) {
   background: rgba(168, 85, 247, 0.18);
   color: #a855f7;
 }
 
-.authBenefitCard:nth-child(2) svg {
+.authBenefitCard:nth-child(2) > svg:not(.authBenefitArrow) {
   background: rgba(34, 197, 94, 0.14);
   color: #34d399;
 }
 
-.authBenefitCard:nth-child(3) svg {
+.authBenefitCard:nth-child(3) > svg:not(.authBenefitArrow) {
   background: rgba(245, 158, 11, 0.14);
   color: #fbbf24;
 }
 
-.authBenefitCard:nth-child(4) svg {
+.authBenefitCard:nth-child(4) > svg:not(.authBenefitArrow) {
   background: rgba(59, 130, 246, 0.16);
   color: #60a5fa;
 }
@@ -1623,7 +1791,7 @@ label,
 
 .authTrustFooter {
   align-self: end;
-  grid-column: 1 / 2;
+  grid-column: 1;
   grid-template-columns: repeat(3, minmax(0, 1fr));
 }
 
@@ -1916,10 +2084,8 @@ label,
 
 .terminalTopbar {
   align-items: center;
-  display: grid;
-  grid-gap: 16px;
-  gap: 16px;
-  grid-template-columns: minmax(280px, 1fr) auto;
+  display: flex;
+  justify-content: flex-end;
   margin-bottom: 18px;
   position: sticky;
   top: 0;
@@ -1928,32 +2094,6 @@ label,
   backdrop-filter: blur(14px);
   border-bottom: 1px solid rgba(148, 163, 184, 0.1);
   padding: 8px 0 10px;
-}
-
-.globalSearch {
-  align-items: center;
-  background: rgba(15, 23, 36, 0.78);
-  border: 1px solid var(--line);
-  border-radius: var(--radius);
-  color: var(--muted);
-  display: flex;
-  gap: 10px;
-  min-height: 44px;
-  padding: 0 12px;
-}
-
-.globalSearch span {
-  flex: 1 1;
-  min-width: 0;
-}
-
-.globalSearch kbd {
-  background: #101b2b;
-  border: 1px solid var(--line);
-  border-radius: 6px;
-  color: var(--text);
-  font-size: 12px;
-  padding: 4px 7px;
 }
 
 .topbarCluster {
@@ -2272,8 +2412,28 @@ label,
   margin-bottom: 10px;
 }
 
+.chartStats {
+  flex-wrap: nowrap;
+  gap: 6px;
+  overflow: hidden;
+  white-space: nowrap;
+}
+
+.chartStats > span {
+  flex: 0 0 auto;
+  font-size: 11px;
+}
+
 .chartStats strong {
   color: var(--text);
+}
+
+.chartAssetName {
+  color: var(--muted-strong);
+  font-weight: 800;
+  max-width: 150px;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .liveStreamBadge {
@@ -2644,34 +2804,106 @@ label,
 }
 
 .tradingConfigForm {
+  align-items: end;
   display: grid;
   grid-gap: 12px 14px;
   gap: 12px 14px;
-  grid-template-columns: repeat(4, minmax(140px, 1fr));
-  align-items: end;
+  grid-template-columns: minmax(190px, 1.5fr) minmax(125px, 0.8fr) minmax(82px, 0.5fr) minmax(125px, 0.8fr) auto;
 }
 
 .tradingConfigPanel .panelHeader {
   margin-bottom: 12px;
 }
 
-.configField--asset {
-  grid-column: span 2;
-}
-
 .tradingConfigForm .configSplit {
   display: contents;
 }
 
-.configField--provider small {
-  display: block;
-  line-height: 1.3;
-  margin-top: 6px;
+.assetCombobox {
+  position: relative;
+}
+
+.assetComboboxControl {
+  align-items: center;
+  display: flex;
+  position: relative;
+}
+
+.assetComboboxControl svg {
+  color: var(--muted);
+  left: 12px;
+  pointer-events: none;
+  position: absolute;
+  z-index: 1;
+}
+
+.assetComboboxControl input {
+  padding-left: 38px;
+  width: 100%;
+}
+
+.assetComboboxMenu {
+  background: #0b1422;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  box-shadow: 0 18px 48px rgba(0, 0, 0, 0.42);
+  display: grid;
+  left: 0;
+  max-height: 300px;
+  overflow-y: auto;
+  padding: 5px;
+  position: absolute;
+  right: 0;
+  top: calc(100% + 6px);
+  z-index: 50;
+}
+
+.assetComboboxOption {
+  align-items: center;
+  background: transparent;
+  border: 0;
+  border-radius: 7px;
+  color: var(--text);
+  cursor: pointer;
+  display: grid;
+  gap: 2px 8px;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  padding: 9px 10px;
+  text-align: left;
+}
+
+.assetComboboxOption--active,
+.assetComboboxOption:hover {
+  background: rgba(34, 211, 238, 0.12);
+}
+
+.assetComboboxOption strong {
+  color: #a5f3fc;
+}
+
+.assetComboboxOption span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.assetComboboxOption em {
+  color: var(--muted);
+  font-size: 10px;
+  font-style: normal;
+  text-transform: uppercase;
+}
+
+.assetComboboxEmpty {
+  color: var(--muted);
+  padding: 14px 10px;
 }
 
 .tradingConfigSubmit {
-  grid-column: span 2;
+  grid-column: auto;
   min-height: 42px;
+  padding-inline: 18px;
+  white-space: nowrap;
 }
 
 .configSplit {
@@ -2696,7 +2928,256 @@ label,
 }
 
 .opportunityChartStage .priceChart {
-  height: clamp(340px, 42vh, 520px);
+  height: clamp(220px, calc(100vh - 430px), 520px);
+}
+
+.microSummaryGrid {
+  display: grid;
+  gap: 14px;
+  grid-template-columns: minmax(0, 0.9fr) minmax(0, 0.95fr) minmax(0, 1.25fr) minmax(0, 1fr);
+}
+
+.marketSummaryCard,
+.operationalMetricsCard,
+.operationalStatusCard,
+.microInsightsPanel {
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.035), transparent),
+    rgba(15, 23, 36, 0.92);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  min-width: 0;
+}
+
+.marketSummaryCard {
+  align-content: start;
+  display: grid;
+  gap: 9px;
+  min-height: 172px;
+  padding: 16px;
+  position: relative;
+}
+
+.marketSummaryCard--empty {
+  color: var(--muted);
+}
+
+.marketSummaryCard--empty > strong {
+  color: var(--text);
+  font-size: 15px;
+}
+
+.marketSummaryTitle {
+  min-width: 0;
+  padding-right: 82px;
+}
+
+.marketSummaryTitle h4 {
+  font-size: 14px;
+  margin: 0;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.marketSummaryTitle .liveStreamBadge {
+  font-size: 10px;
+  min-height: 24px;
+  padding-inline: 8px;
+  position: absolute;
+  right: 16px;
+  top: 16px;
+}
+
+.marketSummaryPrice {
+  font-size: clamp(25px, 2vw, 34px);
+  line-height: 1.1;
+}
+
+.marketSummaryChange {
+  font-size: 14px;
+  font-weight: 900;
+}
+
+.marketSummaryStats {
+  align-items: end;
+  display: grid;
+  gap: 10px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  margin-top: auto;
+}
+
+.marketSummaryStats span {
+  color: var(--muted);
+  display: grid;
+  font-size: 11px;
+  gap: 3px;
+}
+
+.marketSummaryStats strong {
+  color: var(--muted-strong);
+  font-size: 13px;
+}
+
+.microSummaryGrid .decisionCard {
+  gap: 10px;
+  min-height: 172px;
+  padding: 16px;
+}
+
+.microSummaryGrid .decisionCard--empty,
+.microSummaryGrid .decisionCard--loading,
+.microSummaryGrid .decisionCard--error {
+  align-content: center;
+  gap: 8px;
+}
+
+.microSummaryGrid .decisionCard--empty h4,
+.microSummaryGrid .decisionCard--error h4 {
+  font-size: 18px;
+}
+
+.microSummaryGrid .decisionCard--empty p,
+.microSummaryGrid .decisionCard--error p {
+  font-size: 12px;
+}
+
+.microSummaryGrid .decisionBadge {
+  background: transparent;
+  color: var(--success);
+  font-size: 28px;
+  padding: 0;
+}
+
+.microSummaryGrid .decisionBadge--sell {
+  color: var(--danger);
+}
+
+.microSummaryGrid .decisionBadge--wait {
+  color: var(--primary);
+}
+
+.microSummaryGrid .decisionBadge--avoid {
+  color: var(--warning);
+}
+
+.microSummaryGrid .decisionTitle {
+  order: -1;
+}
+
+.microSummaryGrid .decisionTitle h4 {
+  color: var(--text);
+  font-size: 14px;
+  text-transform: none;
+}
+
+.microSummaryGrid .decisionTitle strong {
+  color: var(--muted-strong);
+  font-size: 12px;
+  font-weight: 600;
+  order: 2;
+}
+
+.microSummaryGrid .decisionTopline > span:last-child {
+  display: none;
+}
+
+.microSummaryGrid .confidenceBlock {
+  gap: 7px;
+  margin-top: auto;
+  padding: 10px;
+}
+
+.microSummaryGrid .confidenceBlock strong {
+  font-size: 18px;
+}
+
+.microSummaryGrid .confidenceTrack {
+  height: 5px;
+}
+
+.operationalMetricsCard {
+  padding: 12px;
+}
+
+.operationalMetricsCard .metricMatrix {
+  height: 100%;
+}
+
+.operationalMetricsCard .riskMetricCard {
+  background: rgba(8, 15, 26, 0.48);
+  min-height: 72px;
+}
+
+.operationalStatusCard {
+  padding: 16px;
+}
+
+.operationalStatusCard h4 {
+  font-size: 14px;
+  margin: 0 0 12px;
+}
+
+.operationalStatusCard .opsStatusRows {
+  gap: 0;
+}
+
+.operationalStatusCard .opsStatusRows > span {
+  border-bottom: 1px solid var(--line);
+  grid-template-columns: 17px minmax(70px, 0.7fr) minmax(0, 1fr);
+  padding: 9px 0;
+}
+
+.operationalStatusCard .opsStatusRows > span:last-child {
+  border-bottom: 0;
+}
+
+.operationalStatusCard .opsStatusRows strong {
+  grid-column: 3;
+  text-align: right;
+}
+
+.microMainGrid {
+  display: grid;
+  gap: 14px;
+  grid-template-columns: minmax(0, 1fr) minmax(300px, 0.34fr);
+}
+
+.microInsightsPanel {
+  align-content: start;
+  display: grid;
+  max-height: clamp(260px, calc(100vh - 390px), 558px);
+  min-height: 0;
+  overflow: hidden;
+  padding: 14px;
+}
+
+.microInsightsHeader {
+  align-items: center;
+  display: flex;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.microInsightsHeader svg {
+  color: var(--primary);
+}
+
+.microInsightsHeader h4 {
+  font-size: 14px;
+  margin: 0;
+}
+
+.microInsightsPanel .contextPanel {
+  align-content: start;
+  background: transparent;
+  border: 0;
+  box-shadow: none;
+  grid-template-columns: 1fr;
+  overflow-y: auto;
+  padding: 0 4px 0 0;
 }
 
 .opportunityAnalysisStage {
@@ -3129,22 +3610,15 @@ label,
     rgba(10, 19, 34, 0.58);
   border: 1px solid var(--line);
   border-radius: var(--radius);
-  margin-bottom: 18px;
-  padding: 16px;
+  margin-bottom: 14px;
+  padding: 14px;
 }
 
 .macroResearchForm .analysisForm {
   align-items: end;
   display: grid;
-  grid-gap: 14px;
-  gap: 14px;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-}
-
-.macroResearchForm .controlPanelTitle {
-  border-top: 0;
-  grid-column: 1 / -1;
-  padding-top: 0;
+  gap: 10px 12px;
+  grid-template-columns: minmax(220px, 1.45fr) repeat(3, minmax(110px, 0.75fr)) auto;
 }
 
 .macroResearchForm .fieldGroup {
@@ -3153,6 +3627,196 @@ label,
 
 .macroResearchForm .primaryButton {
   min-height: 40px;
+  padding-inline: 18px;
+  white-space: nowrap;
+}
+
+.macroAdvancedSettings {
+  border-top: 1px solid var(--line);
+  grid-column: 1 / -1;
+  margin-top: 2px;
+  padding-top: 10px;
+}
+
+.macroAdvancedSettings summary {
+  color: var(--primary);
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 850;
+  width: max-content;
+}
+
+.macroAdvancedGrid {
+  align-items: end;
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(3, minmax(150px, 1fr)) minmax(280px, 1.4fr);
+  padding-top: 12px;
+}
+
+.macroAdvancedGrid .macroAnalystField {
+  grid-column: auto;
+}
+
+.macroAdvancedGrid .toggleGrid {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.macroAdvancedGrid .toggle {
+  min-height: 40px;
+}
+
+.macroWorkspace {
+  background: transparent;
+  border: 0;
+  box-shadow: none;
+  padding: 0;
+}
+
+.macroWorkspaceTitle {
+  margin-bottom: 12px;
+}
+
+.macroOverviewGrid {
+  align-items: stretch;
+  display: grid;
+  gap: 14px;
+  grid-template-columns: minmax(0, 1fr) minmax(310px, 0.38fr);
+}
+
+.macroChartPanel {
+  min-width: 0;
+}
+
+.macroChartPanel .chartPanel {
+  padding: 14px;
+}
+
+.macroChartPanel .priceChart {
+  height: clamp(260px, calc(100vh - 410px), 440px);
+}
+
+.macroActivityPanel,
+.macroReportSection {
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.035), transparent),
+    rgba(15, 23, 36, 0.92);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+}
+
+.macroActivityPanel {
+  align-content: start;
+  display: grid;
+  gap: 12px;
+  max-height: clamp(330px, calc(100vh - 350px), 510px);
+  overflow-y: auto;
+  padding: 14px;
+}
+
+.macroActivityHeader,
+.macroReportHeader {
+  align-items: center;
+  display: flex;
+  gap: 10px;
+  justify-content: space-between;
+}
+
+.macroActivityHeader {
+  border-bottom: 1px solid var(--line);
+  padding-bottom: 10px;
+}
+
+.macroActivityHeader h4,
+.macroReportHeader h4 {
+  font-size: 14px;
+  margin: 0;
+}
+
+.macroActivityHeader > span,
+.macroReportHeader > div > span {
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.macroActivityPanel .progressBanner {
+  background: transparent;
+  border: 0;
+  margin: 0;
+  padding: 0;
+}
+
+.macroActivityPanel .progressBannerHeader {
+  background: rgba(34, 211, 238, 0.07);
+  border-radius: var(--radius);
+  padding: 9px;
+}
+
+.macroActivityPanel .progressTimeline {
+  gap: 5px;
+  grid-template-columns: 1fr;
+  overflow: visible;
+}
+
+.macroActivityPanel .progressStage {
+  align-items: center;
+  display: grid;
+  grid-template-columns: 24px minmax(0, 1fr);
+  min-width: 0;
+}
+
+.macroActivityPanel .progressStageLine {
+  display: none;
+}
+
+.macroActivityPanel .progressStageText {
+  align-items: center;
+  display: flex;
+  justify-content: space-between;
+  padding: 6px 0;
+}
+
+.macroActivityPanel .progressStageText strong,
+.macroActivityPanel .progressStageText span {
+  font-size: 11px;
+}
+
+.macroActivityPanel .historySelect {
+  margin: 0;
+}
+
+.macroActivityPanel .stateCard {
+  min-height: 180px;
+}
+
+.macroReportSection {
+  margin-top: 14px;
+  padding: 16px;
+}
+
+.macroReportHeader {
+  margin-bottom: 12px;
+}
+
+.macroReportStatus {
+  background: var(--success-soft);
+  border-radius: 999px;
+  color: #86efac;
+  font-size: 11px;
+  font-weight: 850;
+  padding: 6px 9px;
+}
+
+.macroReportSection .summaryStrip {
+  margin-bottom: 12px;
+}
+
+.macroReportSection .markdownPreview {
+  border: 0;
+  box-shadow: none;
+  max-height: calc(100vh - 260px);
+  padding: 14px 4px 4px;
 }
 
 .brokerIntegrationGrid {
@@ -3182,17 +3846,162 @@ label,
   padding-top: 0;
 }
 
+.brokerConnectionPanel .controlPanelTitle small {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1.45;
+  margin-top: 3px;
+}
+
+.brokerField {
+  display: grid;
+  gap: 7px;
+}
+
+.brokerField > span {
+  align-items: center;
+  display: flex;
+  gap: 8px;
+}
+
+.brokerField em {
+  background: rgba(148, 163, 184, 0.1);
+  border-radius: 999px;
+  color: var(--muted);
+  font-size: 10px;
+  font-style: normal;
+  padding: 2px 7px;
+}
+
+.brokerField small {
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 500;
+  line-height: 1.4;
+}
+
 .brokerActions {
   display: grid;
-  grid-gap: 10px;
-  gap: 10px;
-  grid-template-columns: minmax(0, 1fr) auto;
 }
 
 .brokerActions .secondaryPanelAction:disabled,
 .brokerStatusPanel .secondaryPanelAction:disabled {
   cursor: not-allowed;
   opacity: 0.48;
+}
+
+.brokerStatusPanel {
+  align-content: start;
+}
+
+.brokerStatusHeader {
+  align-items: center;
+  border-bottom: 1px solid var(--line);
+  display: grid;
+  gap: 12px;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  padding-bottom: 14px;
+}
+
+.brokerStatusHeader h4 {
+  font-size: 14px;
+  margin: 0 0 3px;
+}
+
+.brokerStatusHeader > div > span {
+  color: var(--muted);
+  display: block;
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.brokerStatusIcon {
+  align-items: center;
+  background: rgba(148, 163, 184, 0.08);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  color: var(--muted);
+  display: flex;
+  height: 40px;
+  justify-content: center;
+  width: 40px;
+}
+
+.brokerStatusIcon--connected {
+  background: rgba(16, 185, 129, 0.1);
+  border-color: rgba(16, 185, 129, 0.3);
+  color: #34d399;
+}
+
+.brokerConnectionBadge {
+  background: rgba(148, 163, 184, 0.08);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  color: var(--muted-strong);
+  font-size: 11px;
+  font-weight: 800;
+  padding: 6px 10px;
+  white-space: nowrap;
+}
+
+.brokerConnectionBadge--online {
+  background: rgba(16, 185, 129, 0.1);
+  border-color: rgba(16, 185, 129, 0.3);
+  color: #34d399;
+}
+
+.brokerStatusGrid {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.brokerStatusItem {
+  background: rgba(5, 13, 25, 0.44);
+  border: 1px solid rgba(148, 163, 184, 0.12);
+  border-radius: 10px;
+  display: grid;
+  gap: 3px 9px;
+  grid-template-columns: auto minmax(0, 1fr);
+  min-width: 0;
+  padding: 12px;
+}
+
+.brokerStatusItem svg {
+  color: var(--accent);
+  grid-row: 1 / 3;
+  margin-top: 2px;
+}
+
+.brokerStatusItem span {
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.brokerStatusItem strong {
+  color: var(--text);
+  font-size: 13px;
+  line-height: 1.35;
+  min-height: 18px;
+  overflow-wrap: anywhere;
+}
+
+.brokerStatusItem--safe svg,
+.brokerStatusItem--safe strong {
+  color: #34d399;
+}
+
+.brokerStatusFooter {
+  display: grid;
+  justify-items: end;
+  margin-top: auto;
+}
+
+.brokerDisconnectAction:not(:disabled) {
+  border-color: rgba(248, 113, 113, 0.3);
+  color: #fca5a5;
 }
 
 .progressBanner {
@@ -3472,6 +4281,140 @@ label,
   }
 }
 
+@media (max-height: 750px) and (min-width: 861px) {
+  .terminalMain {
+    padding: 8px 16px 16px;
+  }
+
+  .terminalTopbar {
+    margin-bottom: 10px;
+    padding: 4px 0 6px;
+  }
+
+  .opportunityShell {
+    gap: 10px;
+  }
+
+  .tradingConfigPanel {
+    padding: 10px 16px;
+  }
+
+  .tradingConfigForm {
+    gap: 8px 10px;
+  }
+
+  .tradingConfigForm input,
+  .tradingConfigForm select {
+    min-height: 36px;
+  }
+
+  .tradingConfigSubmit {
+    min-height: 38px;
+  }
+
+  .microSummaryGrid,
+  .microMainGrid {
+    gap: 10px;
+  }
+
+  .marketSummaryCard,
+  .microSummaryGrid .decisionCard {
+    min-height: 150px;
+    padding: 12px;
+  }
+
+  .marketSummaryTitle .liveStreamBadge {
+    right: 12px;
+    top: 12px;
+  }
+
+  .marketSummaryPrice {
+    font-size: 24px;
+  }
+
+  .marketSummaryStats {
+    gap: 6px;
+  }
+
+  .microSummaryGrid .decisionBadge {
+    font-size: 22px;
+  }
+
+  .microSummaryGrid .decisionCard--empty p,
+  .microSummaryGrid .decisionCard--error p {
+    display: -webkit-box;
+    overflow: hidden;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 3;
+  }
+
+  .operationalMetricsCard {
+    padding: 8px;
+  }
+
+  .operationalMetricsCard .metricMatrix {
+    gap: 7px;
+  }
+
+  .operationalMetricsCard .riskMetricCard {
+    min-height: 62px;
+    padding: 8px;
+  }
+
+  .operationalStatusCard {
+    padding: 12px;
+  }
+
+  .operationalStatusCard h4 {
+    margin-bottom: 5px;
+  }
+
+  .operationalStatusCard .opsStatusRows > span {
+    padding: 7px 0;
+  }
+
+  .opportunityChartStage .chartPanel {
+    padding: 12px;
+  }
+
+  .microInsightsPanel {
+    max-height: clamp(280px, calc(100vh - 350px), 390px);
+    padding: 12px;
+  }
+
+  .macroResearchForm {
+    margin-bottom: 10px;
+    padding: 10px 12px;
+  }
+
+  .macroResearchForm .analysisForm {
+    gap: 8px 10px;
+  }
+
+  .macroResearchForm input,
+  .macroResearchForm select,
+  .macroResearchForm .primaryButton {
+    min-height: 36px;
+  }
+
+  .macroWorkspaceTitle {
+    margin-bottom: 8px;
+  }
+
+  .macroChartPanel .chartPanel {
+    padding: 12px;
+  }
+
+  .macroChartPanel .priceChart {
+    height: clamp(220px, calc(100vh - 380px), 350px);
+  }
+
+  .macroActivityPanel {
+    max-height: clamp(290px, calc(100vh - 315px), 420px);
+    padding: 12px;
+  }
+}
+
 @media (max-width: 1240px) {
   .authShell {
     grid-template-columns: 1fr;
@@ -3480,6 +4423,10 @@ label,
   .authShell--premium {
     grid-template-columns: 1fr;
     overflow: visible;
+  }
+
+  .authHomeGrid {
+    grid-template-columns: 1fr;
   }
 
   .authCardPanel {
@@ -3500,6 +4447,10 @@ label,
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
+  .authMarketStrip {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
   .terminalShell {
     grid-template-columns: 260px minmax(0, 1fr);
   }
@@ -3510,6 +4461,30 @@ label,
 
   .statGrid {
     grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .microSummaryGrid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .microMainGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .macroOverviewGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .macroActivityPanel {
+    max-height: none;
+  }
+
+  .macroAdvancedGrid {
+    grid-template-columns: repeat(2, minmax(150px, 1fr));
+  }
+
+  .microInsightsPanel {
+    max-height: none;
   }
 
   .marketDeck,
@@ -3532,9 +4507,8 @@ label,
     grid-template-columns: repeat(2, minmax(140px, 1fr));
   }
 
-  .configField--asset,
   .tradingConfigSubmit {
-    grid-column: span 2;
+    grid-column: 1 / -1;
   }
 
   .contextPanel .opsStatusCard {
@@ -3557,6 +4531,33 @@ label,
 
   .authShell--premium {
     gap: 14px;
+  }
+
+  .authPublicHeader nav a {
+    display: none;
+  }
+
+  .authPublicHeader nav button {
+    min-height: 40px;
+    padding-inline: 16px;
+  }
+
+  .authMarketingPanel {
+    grid-template-columns: 1fr;
+  }
+
+  .authMarketingCopy,
+  .authBenefitGrid,
+  .authTrustFooter {
+    grid-column: 1;
+  }
+
+  .authTrustFooter {
+    grid-template-columns: 1fr;
+  }
+
+  .authMarketStrip {
+    grid-template-columns: 1fr;
   }
 
   .authCardPanel {
@@ -3620,14 +4621,25 @@ label,
     padding: 14px;
   }
 
-  .tradingConfigForm,
-  .contextPanel .opsStatusRows {
+  .microSummaryGrid {
     grid-template-columns: 1fr;
   }
 
-  .configField--asset,
-  .tradingConfigSubmit {
+  .macroAdvancedGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .macroAdvancedGrid .macroAnalystField {
     grid-column: auto;
+  }
+
+  .operationalStatusCard .opsStatusRows > span {
+    grid-template-columns: 17px minmax(80px, 0.7fr) minmax(0, 1fr);
+  }
+
+  .tradingConfigForm,
+  .contextPanel .opsStatusRows {
+    grid-template-columns: 1fr;
   }
 
   .sidebarControlPanel {
@@ -3641,6 +4653,20 @@ label,
   }
 
   .brokerActions {
+    grid-template-columns: 1fr;
+  }
+
+  .brokerStatusHeader {
+    align-items: start;
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+
+  .brokerConnectionBadge {
+    grid-column: 2;
+    justify-self: start;
+  }
+
+  .brokerStatusGrid {
     grid-template-columns: 1fr;
   }
 

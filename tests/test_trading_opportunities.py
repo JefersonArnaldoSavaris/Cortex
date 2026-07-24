@@ -209,4 +209,4 @@ def test_agent_does_not_need_live_trading_and_can_skip_audit_log():
     result = TradingOpportunityAgent(log_path=None).analyze(request)
 
     assert result.signals
-    assert "No real order execution" in " ".join(result.signals[0].warnings)
+    assert "não executa ordens reais" in " ".join(result.signals[0].warnings)

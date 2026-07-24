@@ -24,8 +24,8 @@ def calculate_risk_assessment(
 
     if direction in {Direction.WAIT, Direction.AVOID}:
         return RiskAssessment(
-            risk_reasons=["No actionable position size because the decision is not directional."],
-            invalidation_criteria=["Re-run analysis when price structure changes."],
+            risk_reasons=["Não há tamanho de posição operacional porque a decisão não é direcional."],
+            invalidation_criteria=["Execute uma nova análise quando a estrutura de preços mudar."],
         )
 
     atr = max(snapshot.atr, latest_price * 0.002)
@@ -38,15 +38,15 @@ def calculate_risk_assessment(
         stop_loss = latest_price - stop_distance
         take_profit = latest_price + reward_distance
         invalidation = [
-            f"Close below stop loss {stop_loss:.4f}.",
-            f"Break below support {snapshot.support:.4f} with rising volume.",
+            f"Fechamento abaixo do stop loss em {stop_loss:.4f}.",
+            f"Rompimento abaixo do suporte em {snapshot.support:.4f} com aumento de volume.",
         ]
     else:
         stop_loss = latest_price + stop_distance
         take_profit = latest_price - reward_distance
         invalidation = [
-            f"Close above stop loss {stop_loss:.4f}.",
-            f"Break above resistance {snapshot.resistance:.4f} with rising volume.",
+            f"Fechamento acima do stop loss em {stop_loss:.4f}.",
+            f"Rompimento acima da resistência em {snapshot.resistance:.4f} com aumento de volume.",
         ]
 
     per_unit_risk = abs(latest_price - stop_loss)
@@ -62,9 +62,9 @@ def calculate_risk_assessment(
         position_size=round(position_size, 4),
         max_loss=round(max_loss, 2),
         risk_reasons=[
-            f"Risk budget capped at {max_risk_per_trade:.2%} of estimated capital.",
-            f"Stop distance uses ATR adjusted by {risk_profile.value} profile.",
-            "Position size is theoretical and ignores slippage, fees, margin and lot constraints.",
+            f"O orçamento de risco está limitado a {max_risk_per_trade:.2%} do capital estimado.",
+            f"A distância do stop usa o ATR ajustado ao perfil {risk_profile.value}.",
+            "O tamanho da posição é teórico e desconsidera slippage, taxas, margem e restrições de lote.",
         ],
         invalidation_criteria=invalidation,
     )
