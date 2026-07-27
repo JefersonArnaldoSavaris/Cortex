@@ -55,6 +55,7 @@ class OHLCVBar(BaseModel):
 class OpportunityRequest(BaseModel):
     symbol: str = Field(min_length=1, max_length=32)
     strategy_type: StrategyType = StrategyType.DAYTRADE
+    strategy_id: str = Field(default="classic_auto", min_length=1, max_length=64)
     timeframe: Timeframe = Timeframe.M15
     risk_profile: RiskProfile = RiskProfile.MODERADO
     capital: float = Field(default=10_000.0, gt=0)
@@ -121,13 +122,18 @@ class RiskAssessment(BaseModel):
 class OpportunitySignal(BaseModel):
     symbol: str
     strategy_type: StrategyType
+    strategy_id: str = "classic_auto"
     timeframe: Timeframe
     direction: Direction
+    planned_direction: Optional[Direction] = None
     confidence_score: float = Field(ge=0, le=1)
     setup_name: str
     entry_price: Optional[float] = None
     stop_loss: Optional[float] = None
     take_profit: Optional[float] = None
+    entry_zone_low: Optional[float] = None
+    entry_zone_high: Optional[float] = None
+    execution_ready: bool = False
     risk_reward_ratio: Optional[float] = None
     position_size: float = Field(default=0, ge=0)
     max_loss: float = Field(default=0, ge=0)

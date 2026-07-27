@@ -19,6 +19,7 @@ from .strategies import (
     pullback_candidate,
     trend_following_candidate,
 )
+from .strategies.smc import analyze_smc
 
 
 BASE_WARNINGS = [
@@ -31,7 +32,14 @@ BASE_WARNINGS = [
 class TradingOpportunitySignalEngine:
     """Generate structured preliminary signals from OHLCV data."""
 
-    def analyze(self, request: OpportunityRequest, bars: Sequence[OHLCVBar]) -> list[OpportunitySignal]:
+    def analyze(
+        self,
+        request: OpportunityRequest,
+        bars: Sequence[OHLCVBar],
+        context_bars: Sequence[OHLCVBar] | None = None,
+    ) -> list[OpportunitySignal]:
+        if request.strategy_id == "smc":
+            return [analyze_smc(request, bars, context_bars or bars)]
         snapshot = compute_technical_snapshot(bars)
         latest_price = bars[-1].close
         candidates = self._rank_candidates(
@@ -103,6 +111,7 @@ class TradingOpportunitySignalEngine:
         return OpportunitySignal(
             symbol=request.symbol,
             strategy_type=request.strategy_type,
+            strategy_id=request.strategy_id,
             timeframe=request.timeframe,
             direction=direction,
             confidence_score=round(confidence, 2),
@@ -110,6 +119,7 @@ class TradingOpportunitySignalEngine:
             entry_price=risk.entry_price,
             stop_loss=risk.stop_loss,
             take_profit=risk.take_profit,
+            execution_ready=direction in {Direction.BUY, Direction.SELL},
             risk_reward_ratio=risk.risk_reward_ratio,
             position_size=risk.position_size,
             max_loss=risk.max_loss,
@@ -123,6 +133,7 @@ class TradingOpportunitySignalEngine:
         return OpportunitySignal(
             symbol=request.symbol,
             strategy_type=request.strategy_type,
+            strategy_id=request.strategy_id,
             timeframe=request.timeframe,
             direction=Direction.WAIT,
             confidence_score=0.0,

@@ -26,8 +26,8 @@ import {
   type ViewKey,
 } from "./components/platform";
 import { AuthScreen, type AuthMode } from "./components/auth";
-import { OpportunityWorkspace } from "./opportunities/OpportunityWorkspace";
-import type { OpportunityRequest, OpportunityResult, OpportunitySignal, OpportunityTimeframe } from "./opportunities/types";
+import { AssetCombobox, OpportunityWorkspace } from "./opportunities/OpportunityWorkspace";
+import type { OpportunityRequest, OpportunityResult, OpportunitySignal, OpportunityTimeframe, OrderExecution, OrderPreview, OrderStatus, PendingOrderStatus } from "./opportunities/types";
 
 type AnalysisStatus = "queued" | "running" | "completed" | "failed";
 
@@ -131,6 +131,14 @@ type MT5SymbolResponse = {
     path?: string | null;
     visible: boolean;
   }>;
+};
+
+type StrategyOption = {
+  id: string;
+  name: string;
+  description: string;
+  supported_timeframes: string[];
+  context_timeframes: string[];
 };
 
 const API_URL = process.env.NEXT_PUBLIC_CORTEX_API_URL ?? "http://localhost:8000";
@@ -254,6 +262,16 @@ function formatPrice(value: number) {
   }).format(value);
 }
 
+function formatOperationValue(currency: string | undefined, value: number | null | undefined) {
+  if (value == null) return null;
+  const formatted = new Intl.NumberFormat("pt-BR", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+    signDisplay: "always",
+  }).format(value);
+  return `${currency || ""} ${formatted}`.trim();
+}
+
 function formatPointLabel(value: string, interval: string) {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return value;
@@ -328,14 +346,27 @@ function CandleChart({
   points: PricePoint[];
   interval: string;
   period: string;
-  opportunity?: OpportunitySignal | null;
+  opportunity?: {
+    entry_price?: number | null;
+    stop_loss?: number | null;
+    take_profit?: number | null;
+    profit?: number | null;
+    stop_result?: number | null;
+    target_result?: number | null;
+    currency?: string;
+    levelSource?: "analysis" | "execution";
+  } | null;
   liveCandle?: PricePoint | null;
   streamStatus: StreamStatus;
 }) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const seriesRef = useRef<ISeriesApi<"Candlestick"> | null>(null);
+  const entryLineRef = useRef<ReturnType<ISeriesApi<"Candlestick">["createPriceLine"]> | null>(null);
+  const stopLineRef = useRef<ReturnType<ISeriesApi<"Candlestick">["createPriceLine"]> | null>(null);
+  const targetLineRef = useRef<ReturnType<ISeriesApi<"Candlestick">["createPriceLine"]> | null>(null);
   const pointsRef = useRef(points);
   pointsRef.current = points;
+  const isAnalysisLevel = opportunity?.levelSource === "analysis";
 
   const displayPoints = useMemo(() => {
     if (!liveCandle) return points;
@@ -404,42 +435,54 @@ function CandleChart({
     }
 
     if (opportunity?.entry_price) {
-      series.createPriceLine({
+      entryLineRef.current = series.createPriceLine({
         price: opportunity.entry_price,
-        color: "#22d3ee",
+        color: isAnalysisLevel ? "#a78bfa" : "#22d3ee",
         lineWidth: 2,
-        lineStyle: 2,
+        lineStyle: isAnalysisLevel ? 3 : 2,
         axisLabelVisible: true,
-        title: "Entrada",
+        title: isAnalysisLevel ? "Entrada proposta" : formatOperationValue(opportunity.currency, opportunity.profit) ?? "Entrada",
       });
     }
     if (opportunity?.stop_loss) {
-      series.createPriceLine({
+      stopLineRef.current = series.createPriceLine({
         price: opportunity.stop_loss,
-        color: "#ef4444",
+        color: isAnalysisLevel ? "#fb923c" : "#ef4444",
         lineWidth: 2,
-        lineStyle: 2,
+        lineStyle: isAnalysisLevel ? 3 : 2,
         axisLabelVisible: true,
-        title: "Stop",
+        title: isAnalysisLevel ? "Stop projetado" : formatOperationValue(opportunity.currency, opportunity.stop_result) ?? "Stop",
       });
     }
     if (opportunity?.take_profit) {
-      series.createPriceLine({
+      targetLineRef.current = series.createPriceLine({
         price: opportunity.take_profit,
-        color: "#22c55e",
+        color: isAnalysisLevel ? "#60a5fa" : "#22c55e",
         lineWidth: 2,
-        lineStyle: 2,
+        lineStyle: isAnalysisLevel ? 3 : 2,
         axisLabelVisible: true,
-        title: "Alvo",
+        title: isAnalysisLevel ? "Alvo projetado" : formatOperationValue(opportunity.currency, opportunity.target_result) ?? "Alvo",
       });
     }
     chart.timeScale().fitContent();
 
     return () => {
       seriesRef.current = null;
+      entryLineRef.current = null;
+      stopLineRef.current = null;
+      targetLineRef.current = null;
       chart.remove();
     };
-  }, [interval, opportunity?.entry_price, opportunity?.stop_loss, opportunity?.take_profit]);
+  }, [interval, isAnalysisLevel, opportunity?.entry_price, opportunity?.stop_loss, opportunity?.take_profit]);
+
+  useEffect(() => {
+    const currentResult = formatOperationValue(opportunity?.currency, opportunity?.profit);
+    const stopResult = formatOperationValue(opportunity?.currency, opportunity?.stop_result);
+    const targetResult = formatOperationValue(opportunity?.currency, opportunity?.target_result);
+    if (entryLineRef.current && currentResult) entryLineRef.current.applyOptions({ title: currentResult });
+    if (stopLineRef.current && stopResult) stopLineRef.current.applyOptions({ title: stopResult });
+    if (targetLineRef.current && targetResult) targetLineRef.current.applyOptions({ title: targetResult });
+  }, [opportunity?.currency, opportunity?.profit, opportunity?.stop_result, opportunity?.target_result]);
 
   useEffect(() => {
     if (!seriesRef.current || points.length === 0) return;
@@ -454,14 +497,19 @@ function CandleChart({
 
   useEffect(() => {
     if (!seriesRef.current || !liveCandle) return;
+    const liveTimestamp = Math.floor(new Date(liveCandle.date).getTime() / 1000);
+    const lastHistoryTimestamp = points.length > 0
+      ? Math.floor(new Date(points[points.length - 1].date).getTime() / 1000)
+      : -1;
+    if (!Number.isFinite(liveTimestamp) || liveTimestamp < lastHistoryTimestamp) return;
     seriesRef.current.update({
-      time: Math.floor(new Date(liveCandle.date).getTime() / 1000) as UTCTimestamp,
+      time: liveTimestamp as UTCTimestamp,
       open: liveCandle.open,
       high: liveCandle.high,
       low: liveCandle.low,
       close: liveCandle.close,
     });
-  }, [liveCandle]);
+  }, [liveCandle, points]);
 
   if (!stats) {
     return <div className="chartEmpty">Sem dados suficientes para plotar o gráfico.</div>;
@@ -531,13 +579,41 @@ export default function Dashboard() {
   const [chartPeriod, setChartPeriod] = useState("6mo");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isOpportunityLoading, setIsOpportunityLoading] = useState(false);
+  const [opportunityStrategies, setOpportunityStrategies] = useState<StrategyOption[]>([
+    {
+      id: "classic_auto",
+      name: "Automático clássico",
+      description: "Ranking automático dos setups clássicos.",
+      supported_timeframes: ["M1", "M5", "M15", "M30", "H1", "H4", "D1"],
+      context_timeframes: [],
+    },
+    {
+      id: "smc",
+      name: "SMC",
+      description: "Estrutura, liquidez, FVG e order block.",
+      supported_timeframes: ["M1", "M5", "M15", "M30", "H1", "H4", "D1"],
+      context_timeframes: ["M15", "H1", "H4", "D1"],
+    },
+  ]);
   const [isChartLoading, setIsChartLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [opportunityError, setOpportunityError] = useState<string | null>(null);
   const [opportunityResult, setOpportunityResult] = useState<OpportunityResult | null>(null);
-  const [marketDataProvider, setMarketDataProvider] = useState<"yfinance" | "mt5">("yfinance");
+  const [orderPreview, setOrderPreview] = useState<OrderPreview | null>(null);
+  const [orderExecution, setOrderExecution] = useState<OrderExecution | null>(null);
+  const [openOrderStatuses, setOpenOrderStatuses] = useState<OrderStatus[]>([]);
+  const [pendingOrderStatuses, setPendingOrderStatuses] = useState<PendingOrderStatus[]>([]);
+  const [chartedOrderTicket, setChartedOrderTicket] = useState<number | null>(null);
+  const initializedOpenOrderChartRef = useRef(false);
+  const initializedMacroFavoriteSourceRef = useRef<string | null>(null);
+  const [orderError, setOrderError] = useState<string | null>(null);
+  const [isOrderLoading, setIsOrderLoading] = useState(false);
+  const [marketDataProvider, setMarketDataProvider] = useState<"twelvedata" | "yfinance" | "mt5">("twelvedata");
   const [mt5Status, setMt5Status] = useState<MT5StatusResponse>({ connected: false });
   const [mt5Assets, setMt5Assets] = useState<AssetOption[]>([]);
+  const [freeSearchAssets, setFreeSearchAssets] = useState<AssetOption[]>([]);
+  const [favoriteAssets, setFavoriteAssets] = useState<AssetOption[]>([]);
+  const [brokerFavoriteAssets, setBrokerFavoriteAssets] = useState<AssetOption[]>([]);
   const [mt5Form, setMt5Form] = useState<MT5ConnectForm>({ login: "", password: "", server: "", terminal_path: "" });
   const [mt5Error, setMt5Error] = useState<string | null>(null);
   const [isMt5Loading, setIsMt5Loading] = useState(false);
@@ -547,21 +623,22 @@ export default function Dashboard() {
     provider: "google",
     quick_model: "gemini-2.5-flash-lite",
     deep_model: "gemini-2.5-flash-lite",
-    analysts: ["market"],
+    analysts: ["market", "news", "social", "fundamentals"],
     research_depth: 1,
     output_language: "Portuguese",
     mode: "quick_technical",
     checkpoint: false,
   });
   const [opportunityForm, setOpportunityForm] = useState<OpportunityRequest>({
-    symbol: "SPY",
+    symbol: "",
     strategy_type: "daytrade",
+    strategy_id: "classic_auto",
     timeframe: "M15",
     risk_profile: "moderado",
     capital: 10_000,
     max_risk_per_trade: 0.01,
     max_signals: 1,
-    provider: "yfinance",
+    provider: "twelvedata",
     limit: 160,
   });
 
@@ -658,7 +735,10 @@ export default function Dashboard() {
     setAnalyses([]);
     setReport("");
     setMt5Status({ connected: false });
-    setMarketDataProvider("yfinance");
+    setFavoriteAssets([]);
+    setBrokerFavoriteAssets([]);
+    initializedMacroFavoriteSourceRef.current = null;
+    setMarketDataProvider("twelvedata");
     setAuthMode("login");
   }
 
@@ -672,14 +752,18 @@ export default function Dashboard() {
     completedAnalyses.find((analysis) => analysis.id === selectedId) ?? completedAnalyses[0] ?? null;
   const requestedChartSymbol = activeView === "oportunidades-micro"
     ? (marketDataProvider === "mt5"
-        ? (opportunityForm.symbol.trim() || "SPY")
-        : (opportunityForm.symbol.trim().toUpperCase() || "SPY"))
+        ? opportunityForm.symbol.trim()
+        : opportunityForm.symbol.trim().toUpperCase())
     : form.ticker;
-  const opportunityAssets = marketDataProvider === "mt5" && mt5Assets.length > 0 ? mt5Assets : (options?.assets ?? []);
+  const opportunityAssets = marketDataProvider === "mt5"
+    ? mt5Assets
+    : [...favoriteAssets, ...freeSearchAssets].filter(
+        (asset, index, items) => items.findIndex((candidate) => candidate.symbol === asset.symbol) === index,
+      );
   const chartSymbol = marketDataProvider === "mt5"
     ? (mt5Assets.find((asset) => asset.symbol === requestedChartSymbol)?.symbol ?? mt5Assets[0]?.symbol ?? "")
     : requestedChartSymbol;
-  const selectedAsset = [...(options?.assets ?? []), ...mt5Assets].find((asset) => asset.symbol === chartSymbol);
+  const selectedAsset = opportunityAssets.find((asset) => asset.symbol === chartSymbol);
   const marketSummary = useMemo(() => {
     if (history.length < 2) return null;
     const first = history[0];
@@ -696,6 +780,12 @@ export default function Dashboard() {
     };
   }, [chartSymbol, history, selectedAsset?.name]);
   const opportunitySignal = opportunityResult?.signals[0] ?? null;
+  const chartedOrder = openOrderStatuses.find((status) => status.position_ticket === chartedOrderTicket) ?? null;
+  const chartLevels = chartedOrder?.symbol === chartSymbol
+    ? { ...chartedOrder, levelSource: "execution" as const }
+    : opportunitySignal
+      ? { ...opportunitySignal, levelSource: "analysis" as const }
+      : null;
   const periodOptions = periodOptionsByInterval[chartInterval] ?? periodOptionsByInterval["1d"];
   const activeChartPeriod = periodOptions.some((period) => period.value === chartPeriod)
     ? chartPeriod
@@ -706,6 +796,14 @@ export default function Dashboard() {
     const nextPeriods = periodOptionsByInterval[nextInterval] ?? periodOptionsByInterval["1d"];
     setChartInterval(nextInterval);
     setChartPeriod(nextPeriods[nextPeriods.length - 1]?.value ?? "1y");
+  }
+
+  function viewOrderOnChart(status: OrderStatus) {
+    setChartedOrderTicket(status.position_ticket ?? null);
+    setOpportunityForm((current) => ({ ...current, symbol: status.symbol }));
+    window.setTimeout(() => {
+      document.getElementById("cortex-market-chart")?.scrollIntoView({ behavior: "smooth", block: "center" });
+    }, 100);
   }
 
   async function loadOptions() {
@@ -730,6 +828,46 @@ export default function Dashboard() {
     setAnalyses(data.analyses);
     const completed = data.analyses.filter((analysis) => analysis.status === "completed");
     if (!selectedId && completed.length > 0) setSelectedId(completed[0].id);
+  }
+
+  async function loadFavorites() {
+    const response = await fetch(`${API_URL}/favorites`, { credentials: "include" });
+    if (!response.ok) throw new Error(await readApiError(response, "Não foi possível carregar os favoritos."));
+    const data = (await response.json()) as { assets: AssetOption[] };
+    setFavoriteAssets(data.assets);
+  }
+
+  async function loadOpportunityStrategies() {
+    const response = await fetch(`${API_URL}/opportunities/strategies`, { credentials: "include" });
+    if (!response.ok) throw new Error(await readApiError(response, "Não foi possível carregar o catálogo de estratégias."));
+    const data = (await response.json()) as { strategies: StrategyOption[] };
+    setOpportunityStrategies(data.strategies);
+  }
+
+  async function loadBrokerFavorites() {
+    const response = await fetch(`${API_URL}/favorites/mt5/list`, { credentials: "include" });
+    if (!response.ok) throw new Error(await readApiError(response, "Não foi possível carregar os favoritos da corretora."));
+    const data = (await response.json()) as { assets: AssetOption[] };
+    setBrokerFavoriteAssets(data.assets);
+  }
+
+  async function toggleFavorite(asset: AssetOption) {
+    const isBrokerFavorite = marketDataProvider === "mt5";
+    const currentFavorites = isBrokerFavorite ? brokerFavoriteAssets : favoriteAssets;
+    const isFavorite = currentFavorites.some((favorite) => favorite.symbol === asset.symbol);
+    const endpoint = isBrokerFavorite ? "favorites/mt5" : "favorites";
+    const response = await fetch(`${API_URL}/${endpoint}/${encodeURIComponent(asset.symbol)}`, {
+      method: isFavorite ? "DELETE" : "PUT",
+      credentials: "include",
+      headers: isFavorite ? undefined : { "Content-Type": "application/json" },
+      body: isFavorite ? undefined : JSON.stringify(asset),
+    });
+    if (!response.ok) throw new Error(await readApiError(response, "Não foi possível atualizar o favorito."));
+    const update = (current: AssetOption[]) => isFavorite
+      ? current.filter((favorite) => favorite.symbol !== asset.symbol)
+      : [...current, asset];
+    if (isBrokerFavorite) setBrokerFavoriteAssets(update);
+    else setFavoriteAssets(update);
   }
 
   async function loadReport(id: string) {
@@ -776,12 +914,25 @@ export default function Dashboard() {
     setMt5Status(data);
     if (data.connected) {
       setMarketDataProvider("mt5");
-      setOpportunityForm((current) => ({ ...current, provider: "mt5" }));
+      setOpportunityForm((current) => ({ ...current, symbol: "", provider: "mt5" }));
       await loadMt5Symbols();
     } else {
-      setMarketDataProvider("yfinance");
+      setMarketDataProvider("twelvedata");
       setMt5Assets([]);
+      setOpportunityForm((current) => ({ ...current, symbol: "", provider: "twelvedata" }));
     }
+  }
+
+  async function searchFreeAssets(query: string) {
+    if (marketDataProvider === "mt5" || query.trim().length < 2) {
+      setFreeSearchAssets([]);
+      return;
+    }
+    const params = new URLSearchParams({ query: query.trim(), limit: "15" });
+    const response = await fetch(`${API_URL}/assets/search?${params.toString()}`, { credentials: "include" });
+    if (!response.ok) return;
+    const data = (await response.json()) as { assets: AssetOption[] };
+    setFreeSearchAssets(data.assets);
   }
 
   async function loadMt5Symbols() {
@@ -801,6 +952,12 @@ export default function Dashboard() {
         symbol: assets.some((asset) => asset.symbol === current.symbol) ? current.symbol : assets[0].symbol,
         provider: "mt5",
       }));
+      setForm((current) => ({
+        ...current,
+        ticker: assets.some((asset) => asset.symbol === current.ticker) ? current.ticker : assets[0].symbol,
+      }));
+    } else {
+      setOpportunityForm((current) => ({ ...current, symbol: "", provider: "mt5" }));
     }
   }
 
@@ -812,12 +969,28 @@ export default function Dashboard() {
     if (!user) return;
     loadOptions().catch((err: Error) => setError(err.message));
     loadAnalyses().catch((err: Error) => setError(err.message));
+    loadFavorites().catch((err: Error) => setError(err.message));
+    loadOpportunityStrategies().catch((err: Error) => setError(err.message));
+    loadBrokerFavorites().catch((err: Error) => setError(err.message));
     loadMt5Status().catch((err: Error) => setMt5Error(err.message));
   }, [user?.id]);
 
   useEffect(() => {
+    const source = marketDataProvider === "mt5" ? "mt5" : "free";
+    const favorites = marketDataProvider === "mt5" ? brokerFavoriteAssets : favoriteAssets;
+    if (favorites.length === 0 || initializedMacroFavoriteSourceRef.current === source) return;
+    initializedMacroFavoriteSourceRef.current = source;
+    setForm((current) => ({ ...current, ticker: favorites[0].symbol }));
+  }, [brokerFavoriteAssets, favoriteAssets, marketDataProvider]);
+
+  useEffect(() => {
     if (!user) return;
     if (activeView === "integracoes") return;
+    if (!chartSymbol) {
+      setHistory([]);
+      setLiveCandle(null);
+      return;
+    }
     if (marketDataProvider === "mt5" && (!mt5Status.connected || mt5Assets.length === 0)) return;
     if (activeChartPeriod !== chartPeriod) {
       setChartPeriod(activeChartPeriod);
@@ -830,7 +1003,7 @@ export default function Dashboard() {
   }, [activeChartPeriod, activeView, chartInterval, chartPeriod, chartSymbol, marketDataProvider, mt5Assets.length, mt5Status.connected, user]);
 
   useEffect(() => {
-    if (!user || marketDataProvider !== "mt5" || !mt5Status.connected || !chartSymbol) {
+    if (!user || !chartSymbol || (marketDataProvider === "mt5" && !mt5Status.connected)) {
       setStreamStatus("offline");
       setLiveCandle(null);
       return;
@@ -844,7 +1017,9 @@ export default function Dashboard() {
       if (cancelled) return;
       setStreamStatus((current) => current === "offline" ? "connecting" : "reconnecting");
       const wsBase = API_URL.replace(/^http/, "ws");
-      socket = new WebSocket(`${wsBase}/ws/market-data?symbol=${encodeURIComponent(chartSymbol)}`);
+      socket = new WebSocket(
+        `${wsBase}/ws/market-data?symbol=${encodeURIComponent(chartSymbol)}&provider=${encodeURIComponent(marketDataProvider)}`,
+      );
       socket.onopen = () => setStreamStatus("live");
       socket.onmessage = (event) => {
         const message = JSON.parse(event.data) as MarketTick | { type: "heartbeat" | "error"; message?: string };
@@ -958,6 +1133,11 @@ export default function Dashboard() {
     setIsOpportunityLoading(true);
     setOpportunityError(null);
     setError(null);
+    setOrderPreview(null);
+    setOrderExecution(null);
+    setOrderError(null);
+    setOpportunityResult(null);
+    setChartedOrderTicket(null);
     try {
       const response = await fetch(`${API_URL}/opportunities/analyze`, {
         method: "POST",
@@ -984,6 +1164,182 @@ export default function Dashboard() {
     }
   }
 
+  async function previewOrder(volume: number) {
+    const signal = opportunityResult?.signals[0];
+    const direction = ["BUY", "SELL"].includes(signal?.direction ?? "") ? signal?.direction : signal?.planned_direction;
+    const isPending = signal?.direction === "WAIT" && signal.strategy_id === "smc";
+    if (!signal || !signal.stop_loss || !signal.take_profit || !signal.entry_price || !direction) return;
+    setIsOrderLoading(true);
+    setOrderError(null);
+    try {
+      const response = await fetch(`${API_URL}/${isPending ? "orders/pending/preview" : "orders/preview"}`, {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          symbol: signal.symbol,
+          direction,
+          volume,
+          ...(isPending ? { entry_price: signal.entry_price } : {}),
+          stop_loss: signal.stop_loss,
+          take_profit: signal.take_profit,
+        }),
+      });
+      if (!response.ok) throw new Error(await readApiError(response, "Não foi possível validar a ordem."));
+      setOrderPreview((await response.json()) as OrderPreview);
+      setOrderExecution(null);
+    } catch (err) {
+      setOrderError(err instanceof Error ? err.message : "Erro ao validar a ordem.");
+    } finally {
+      setIsOrderLoading(false);
+    }
+  }
+
+  async function executeOrder(volume: number) {
+    const signal = opportunityResult?.signals[0];
+    const direction = ["BUY", "SELL"].includes(signal?.direction ?? "") ? signal?.direction : signal?.planned_direction;
+    const isPending = orderPreview?.order_kind === "pending";
+    if (!signal || !signal.stop_loss || !signal.take_profit || !signal.entry_price || !direction) return;
+    setIsOrderLoading(true);
+    setOrderError(null);
+    try {
+      const response = await fetch(`${API_URL}/${isPending ? "orders/pending/execute" : "orders/execute"}`, {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          symbol: signal.symbol,
+          direction,
+          volume,
+          ...(isPending ? { entry_price: signal.entry_price } : {}),
+          stop_loss: signal.stop_loss,
+          take_profit: signal.take_profit,
+          technical_reasons: signal.technical_reasons,
+          risk_reasons: signal.risk_reasons,
+          analysis_generated_at: signal.generated_at,
+        }),
+      });
+      if (!response.ok) throw new Error(await readApiError(response, "A corretora rejeitou a ordem."));
+      const execution = (await response.json()) as OrderExecution;
+      setOrderExecution(execution);
+      if (execution.position_ticket) setChartedOrderTicket(execution.position_ticket);
+    } catch (err) {
+      setOrderError(err instanceof Error ? err.message : "Erro ao enviar a ordem.");
+    } finally {
+      setIsOrderLoading(false);
+    }
+  }
+
+  async function closePosition(positionTicket: number) {
+    setIsOrderLoading(true);
+    setOrderError(null);
+    try {
+      const response = await fetch(`${API_URL}/orders/close`, {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ position_ticket: positionTicket }),
+      });
+      if (!response.ok) throw new Error(await readApiError(response, "A corretora rejeitou o fechamento."));
+      if (chartedOrderTicket === positionTicket) setChartedOrderTicket(null);
+      setOpenOrderStatuses((current) => current.filter((status) => status.position_ticket !== positionTicket));
+    } catch (err) {
+      setOrderError(err instanceof Error ? err.message : "Erro ao fechar a posição.");
+    } finally {
+      setIsOrderLoading(false);
+    }
+  }
+
+  async function closeAllPositions(positionTickets: number[]) {
+    setIsOrderLoading(true);
+    setOrderError(null);
+    const closed: number[] = [];
+    const failures: string[] = [];
+    for (const positionTicket of positionTickets) {
+      try {
+        const response = await fetch(`${API_URL}/orders/close`, {
+          method: "POST",
+          credentials: "include",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ position_ticket: positionTicket }),
+        });
+        if (!response.ok) throw new Error(await readApiError(response, `Falha no ticket ${positionTicket}.`));
+        closed.push(positionTicket);
+      } catch (err) {
+        failures.push(err instanceof Error ? err.message : `Falha no ticket ${positionTicket}.`);
+      }
+    }
+    setOpenOrderStatuses((current) => current.filter((status) => !closed.includes(status.position_ticket ?? 0)));
+    if (chartedOrderTicket && closed.includes(chartedOrderTicket)) setChartedOrderTicket(null);
+    if (failures.length > 0) setOrderError(`${closed.length} posição(ões) fechada(s). ${failures.join(" ")}`);
+    setIsOrderLoading(false);
+  }
+
+  async function cancelPendingOrder(orderTicket: number) {
+    setIsOrderLoading(true);
+    setOrderError(null);
+    try {
+      const response = await fetch(`${API_URL}/orders/pending/cancel`, {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ order_ticket: orderTicket }),
+      });
+      if (!response.ok) throw new Error(await readApiError(response, "A corretora rejeitou o cancelamento."));
+      setPendingOrderStatuses((current) => current.filter((order) => order.order_ticket !== orderTicket));
+    } catch (err) {
+      setOrderError(err instanceof Error ? err.message : "Erro ao cancelar a ordem pendente.");
+    } finally {
+      setIsOrderLoading(false);
+    }
+  }
+
+  function resetOrderPreparation() {
+    setOrderPreview(null);
+    setOrderExecution(null);
+    setOrderError(null);
+  }
+
+  useEffect(() => {
+    if (marketDataProvider !== "mt5" || !mt5Status.connected) {
+      setOpenOrderStatuses([]);
+      setPendingOrderStatuses([]);
+      setChartedOrderTicket(null);
+      initializedOpenOrderChartRef.current = false;
+      return;
+    }
+    let cancelled = false;
+    const loadStatus = async () => {
+      try {
+        const [positionsResponse, pendingResponse] = await Promise.all([
+          fetch(`${API_URL}/orders/open`, { credentials: "include" }),
+          fetch(`${API_URL}/orders/pending`, { credentials: "include" }),
+        ]);
+        if (!positionsResponse.ok || !pendingResponse.ok) return;
+        const statuses = (await positionsResponse.json()) as OrderStatus[];
+        const pending = (await pendingResponse.json()) as PendingOrderStatus[];
+        if (!cancelled) {
+          setOpenOrderStatuses(statuses);
+          setPendingOrderStatuses(pending);
+          if (!initializedOpenOrderChartRef.current && statuses.length > 0) {
+            const firstOpenOrder = statuses[0];
+            initializedOpenOrderChartRef.current = true;
+            setChartedOrderTicket(firstOpenOrder.position_ticket ?? null);
+            setOpportunityForm((current) => ({ ...current, symbol: firstOpenOrder.symbol }));
+          }
+        }
+      } catch {
+        // Keep the last known positions during transient connectivity issues.
+      }
+    };
+    void loadStatus();
+    const timer = window.setInterval(loadStatus, 1000);
+    return () => {
+      cancelled = true;
+      window.clearInterval(timer);
+    };
+  }, [marketDataProvider, mt5Status.connected, orderExecution?.order_ticket, orderExecution?.position_ticket]);
+
   async function connectMt5(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setIsMt5Loading(true);
@@ -1004,7 +1360,7 @@ export default function Dashboard() {
       const data = (await response.json()) as MT5StatusResponse;
       setMt5Status(data);
       setMarketDataProvider("mt5");
-      setOpportunityForm((current) => ({ ...current, provider: "mt5" }));
+      setOpportunityForm((current) => ({ ...current, symbol: "", provider: "mt5" }));
       setMt5Form((current) => ({ ...current, password: "" }));
       await loadMt5Symbols();
       setError(null);
@@ -1023,9 +1379,10 @@ export default function Dashboard() {
       if (!response.ok) throw new Error(await readApiError(response, "Não foi possível desconectar o MT5."));
       const data = (await response.json()) as MT5StatusResponse;
       setMt5Status(data);
-      setMarketDataProvider("yfinance");
+      setMarketDataProvider("twelvedata");
       setMt5Assets([]);
-      setOpportunityForm((current) => ({ ...current, provider: "yfinance" }));
+      setOpportunityForm((current) => ({ ...current, symbol: "", provider: "twelvedata" }));
+      setForm((current) => ({ ...current, ticker: "SPY" }));
     } catch (err) {
       setMt5Error(err instanceof Error ? err.message : "Erro inesperado ao desconectar MT5.");
     } finally {
@@ -1083,18 +1440,17 @@ export default function Dashboard() {
 
   const analysisControlPanel = (
     <form className="analysisForm" onSubmit={submitAnalysis}>
-      <label className="macroField macroField--asset">
-        Ativo
-        <select value={form.ticker} onChange={(event) => setForm({ ...form, ticker: event.target.value })}>
-          {(options?.assets ?? [{ symbol: "SPY", name: "SPDR S&P 500 ETF", category: "ETF", default_provider_symbol: "SPY" }]).map(
-            (asset) => (
-              <option key={asset.symbol} value={asset.symbol}>
-                {asset.symbol} - {asset.name}
-              </option>
-            ),
-          )}
-        </select>
-      </label>
+      <div className="macroField macroField--asset">
+        <AssetCombobox
+          assets={opportunityAssets}
+          favorites={marketDataProvider === "mt5" ? brokerFavoriteAssets : favoriteAssets}
+          favoritesEnabled
+          value={form.ticker}
+          onChange={(ticker) => setForm({ ...form, ticker })}
+          onSearch={searchFreeAssets}
+          onToggleFavorite={(asset) => toggleFavorite(asset).catch((err: Error) => setError(err.message))}
+        />
+      </div>
 
       <label className="macroField">
         Data
@@ -1105,7 +1461,7 @@ export default function Dashboard() {
         />
       </label>
 
-      <label className="macroField">
+      {false && <label className="macroField">
         Provedor
         <select value={form.provider} onChange={(event) => syncModelDefaults(event.target.value)}>
           {Object.keys(options?.providers ?? { google: null }).map((provider) => (
@@ -1114,9 +1470,9 @@ export default function Dashboard() {
             </option>
           ))}
         </select>
-      </label>
+      </label>}
 
-      <label className="macroField macroField--depth">
+      {false && <label className="macroField macroField--depth">
         Profundidade
         <input
           max={5}
@@ -1125,14 +1481,30 @@ export default function Dashboard() {
           value={form.research_depth}
           onChange={(event) => setForm({ ...form, research_depth: Number(event.target.value) })}
         />
-      </label>
+      </label>}
+
+      <div className="fieldGroup macroAnalystField">
+        <span>Analistas</span>
+        <div className="toggleGrid">
+          {analystOptions.map((option) => (
+            <button
+              className={form.analysts.includes(option.value) ? "toggle active" : "toggle"}
+              key={option.value}
+              onClick={() => updateAnalysts(option.value)}
+              type="button"
+            >
+              {option.label}
+            </button>
+          ))}
+        </div>
+      </div>
 
       <button className="primaryButton" disabled={isSubmitting} type="submit">
         {isSubmitting ? <RefreshCw size={17} /> : <Play size={17} />}
         Analisar cenário
       </button>
 
-      <details className="macroAdvancedSettings">
+      {false && <details className="macroAdvancedSettings">
         <summary>Configurações avançadas</summary>
         <div className="macroAdvancedGrid">
           <label>
@@ -1178,12 +1550,12 @@ export default function Dashboard() {
             </div>
           </div>
         </div>
-      </details>
+      </details>}
     </form>
   );
 
   const marketPanel = (
-          <section className="chartPanel">
+          <section className="chartPanel" id="cortex-market-chart">
             {isChartLoading ? (
               <LoadingState message="Carregando gráfico de mercado..." />
             ) : (
@@ -1192,7 +1564,7 @@ export default function Dashboard() {
                 points={history}
                 interval={chartInterval}
                 period={activeChartPeriod}
-                opportunity={opportunitySignal}
+                opportunity={activeView === "oportunidades-micro" ? chartLevels : null}
                 liveCandle={liveCandle}
                 streamStatus={streamStatus}
               />
@@ -1216,15 +1588,32 @@ export default function Dashboard() {
 
       {activeView === "oportunidades-micro" ? (
         <OpportunityWorkspace
-          assets={opportunityAssets.length > 0 ? opportunityAssets : [
-            { symbol: "SPY", name: "SPDR S&P 500 ETF", category: "ETF", default_provider_symbol: "SPY" },
-          ]}
+          assets={opportunityAssets}
           chartSlot={marketPanel}
           error={opportunityError}
           form={opportunityForm}
           formatPrice={formatPrice}
+          favorites={marketDataProvider === "mt5" ? brokerFavoriteAssets : favoriteAssets}
+          favoritesEnabled
+          strategies={opportunityStrategies}
           isLoading={isOpportunityLoading}
           marketSummary={marketSummary}
+          orderError={orderError}
+          orderExecution={orderExecution}
+          orderPreview={orderPreview}
+          orderStatuses={openOrderStatuses}
+          pendingOrderStatuses={pendingOrderStatuses}
+          viewedOrder={null}
+          isOrderLoading={isOrderLoading}
+          onAssetSearch={searchFreeAssets}
+          onExecuteOrder={executeOrder}
+          onCloseOrder={closePosition}
+          onCloseAllOrders={closeAllPositions}
+          onCancelPendingOrder={cancelPendingOrder}
+          onResetOrder={resetOrderPreparation}
+          onPreviewOrder={previewOrder}
+          onViewOrderOnChart={viewOrderOnChart}
+          onToggleFavorite={(asset) => toggleFavorite(asset).catch((err: Error) => setError(err.message))}
           onSubmit={submitOpportunity}
           result={opportunityResult}
           setForm={setOpportunityForm}
@@ -1302,7 +1691,7 @@ export default function Dashboard() {
                 >
                   {completedAnalyses.map((analysis) => (
                     <option key={analysis.id} value={analysis.id}>
-                      {analysis.request.ticker} · {analysis.request.analysis_date} · {analysis.request.provider}
+                      {analysis.request.ticker} · {analysis.request.analysis_date}
                     </option>
                   ))}
                 </select>
@@ -1328,12 +1717,12 @@ export default function Dashboard() {
                   </div>
                   <span className="macroReportStatus">{statusLabels[selectedAnalysis.status]}</span>
                 </div>
-                <div className="summaryStrip">
+                {false && <div className="summaryStrip">
                   <span>{selectedAnalysis.request.provider}</span>
                   <span>{selectedAnalysis.request.quick_model}</span>
                   <span>{selectedAnalysis.request.deep_model}</span>
                   <span>{selectedAnalysis.request.analysts.map((item) => analystOptions.find((option) => option.value === item)?.label ?? item).join(", ")}</span>
-                </div>
+                </div>}
 
                 {selectedAnalysis.error && <div className="errorBanner">{selectedAnalysis.error}</div>}
 
@@ -1425,7 +1814,7 @@ export default function Dashboard() {
               </div>
 
               <div className="brokerStatusGrid">
-                <div className="brokerStatusItem"><HardDrive size={17} /><span>Fonte de dados</span><strong>{mt5Status.connected ? (marketDataProvider === "mt5" ? "MetaTrader 5" : "yFinance") : ""}</strong></div>
+                <div className="brokerStatusItem"><HardDrive size={17} /><span>Fonte de dados</span><strong>{mt5Status.connected ? (marketDataProvider === "mt5" ? "MetaTrader 5" : "Twelve Data") : ""}</strong></div>
                 <div className="brokerStatusItem"><UserRound size={17} /><span>Conta</span><strong>{mt5Status.connected ? mt5Status.login ?? "" : ""}</strong></div>
                 <div className="brokerStatusItem"><Server size={17} /><span>Servidor</span><strong>{mt5Status.connected ? mt5Status.server ?? "" : ""}</strong></div>
                 <div className="brokerStatusItem"><Building2 size={17} /><span>Corretora</span><strong>{mt5Status.connected ? mt5Status.company ?? "" : ""}</strong></div>

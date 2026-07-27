@@ -25,6 +25,10 @@ class YFinanceMarketDataProvider(MarketDataProvider):
             "BTC": "BTC-USD",
             "BTCUSD": "BTC-USD",
             "XAUUSD": "GC=F",
+            "XAGUSD": "SI=F",
+            "EURUSD": "EURUSD=X",
+            "USDJPY": "JPY=X",
+            "USDBRL": "BRL=X",
         }.get(symbol.upper(), symbol)
         interval = TIMEFRAME_TO_YFINANCE_INTERVAL[timeframe.value]
         period = "7d" if timeframe in {Timeframe.M1, Timeframe.M5, Timeframe.M15, Timeframe.M30} else "1y"

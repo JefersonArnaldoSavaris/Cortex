@@ -18,6 +18,7 @@ from sqlalchemy.exc import IntegrityError
 
 from .db import session_scope
 from .models import AuthUser, ForgotPasswordRequest, LoginRequest, RegisterRequest, UserPlan, UserRole, UserStatus
+from .favorite_repository import add_default_favorites
 from .orm import UserORM
 
 AUTH_COOKIE_NAME = "cortex_session"
@@ -164,6 +165,7 @@ def register_user(payload: RegisterRequest) -> AuthUser:
         with session_scope() as session:
             session.add(user)
             session.flush()
+            add_default_favorites(session, user.id)
             session.refresh(user)
             return to_auth_user(user)
     except IntegrityError:

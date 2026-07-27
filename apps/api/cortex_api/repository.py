@@ -13,6 +13,10 @@ from .orm import AnalysisEventORM, AnalysisORM, Base
 def init_db() -> None:
     if engine.dialect.name == "postgresql":
         with engine.begin() as connection:
+            # Existing installations may still keep product tables in public.
+            # Keep that schema up to date before maintaining the namespaced
+            # Cortex copy so upgrades do not strand newly added tables.
+            Base.metadata.create_all(bind=connection)
             connection.execute(text("CREATE SCHEMA IF NOT EXISTS cortex"))
             schema_connection = connection.execution_options(
                 schema_translate_map={None: "cortex"}

@@ -8,8 +8,10 @@ import {
   Loader2,
   RadioTower,
   Search,
+  Send,
   ShieldAlert,
   Sparkles,
+  Star,
   Target,
 } from "lucide-react";
 import { useEffect, useMemo, useState, type Dispatch, type FormEvent, type KeyboardEvent, type ReactNode, type SetStateAction } from "react";
@@ -23,6 +25,10 @@ import type {
   OpportunitySignal,
   OpportunityStrategyType,
   OpportunityTimeframe,
+  OrderExecution,
+  OrderPreview,
+  OrderStatus,
+  PendingOrderStatus,
 } from "./types";
 
 const opportunityTimeframes: Array<{ value: OpportunityTimeframe; label: string }> = [
@@ -58,6 +64,15 @@ const setupLabels: Record<string, string> = {
   evitar_mercado_de_baixa_qualidade: "Evitar mercado de baixa qualidade",
   no_setup: "Sem setup",
   sem_setup: "Sem setup",
+  smc_liquidity_structure: "SMC · Estrutura e liquidez",
+};
+
+type StrategyOption = {
+  id: string;
+  name: string;
+  description: string;
+  supported_timeframes: string[];
+  context_timeframes: string[];
 };
 
 const directionTone: Record<OpportunityDirection, string> = {
@@ -69,8 +84,27 @@ const directionTone: Record<OpportunityDirection, string> = {
 
 type OpportunityWorkspaceProps = {
   assets: Array<{ symbol: string; name: string; category: string }>;
+  favorites: Array<{ symbol: string; name: string; category: string; default_provider_symbol: string }>;
+  favoritesEnabled: boolean;
+  strategies: StrategyOption[];
   form: OpportunityRequest;
   setForm: Dispatch<SetStateAction<OpportunityRequest>>;
+  onAssetSearch?: (query: string) => void;
+  onToggleFavorite: (asset: { symbol: string; name: string; category: string; default_provider_symbol: string }) => void;
+  orderPreview: OrderPreview | null;
+  orderExecution: OrderExecution | null;
+  orderError: string | null;
+  orderStatuses: OrderStatus[];
+  pendingOrderStatuses: PendingOrderStatus[];
+  viewedOrder: OrderStatus | null;
+  isOrderLoading: boolean;
+  onPreviewOrder: (volume: number) => void;
+  onExecuteOrder: (volume: number) => void;
+  onCloseOrder: (positionTicket: number) => void;
+  onCloseAllOrders: (positionTickets: number[]) => void;
+  onCancelPendingOrder: (orderTicket: number) => void;
+  onResetOrder: () => void;
+  onViewOrderOnChart: (status: OrderStatus) => void;
   result: OpportunityResult | null;
   error: string | null;
   isLoading: boolean;
@@ -89,8 +123,27 @@ type OpportunityWorkspaceProps = {
 
 export function OpportunityWorkspace({
   assets,
+  favorites,
+  favoritesEnabled,
+  strategies,
   form,
   setForm,
+  onAssetSearch,
+  onToggleFavorite,
+  orderPreview,
+  orderExecution,
+  orderError,
+  orderStatuses,
+  pendingOrderStatuses,
+  viewedOrder,
+  isOrderLoading,
+  onPreviewOrder,
+  onExecuteOrder,
+  onCloseOrder,
+  onCloseAllOrders,
+  onCancelPendingOrder,
+  onResetOrder,
+  onViewOrderOnChart,
   result,
   error,
   isLoading,
@@ -104,7 +157,18 @@ export function OpportunityWorkspace({
   return (
     <section className="opportunityWorkspace">
       <div className="opportunityShell opportunityShell--horizontal">
-        <TradingConfigPanel assets={assets} form={form} setForm={setForm} isLoading={isLoading} onSubmit={onSubmit} />
+        <TradingConfigPanel
+          assets={assets}
+          favorites={favorites}
+          favoritesEnabled={favoritesEnabled}
+          strategies={strategies}
+          form={form}
+          setForm={setForm}
+          isLoading={isLoading}
+          onAssetSearch={onAssetSearch}
+          onToggleFavorite={onToggleFavorite}
+          onSubmit={onSubmit}
+        />
         <div className="microSummaryGrid">
           <MarketSummaryCard summary={marketSummary} formatPrice={formatPrice} />
           <OpportunityDecisionCard
@@ -113,12 +177,6 @@ export function OpportunityWorkspace({
             error={error}
           />
           <OperationalMetricsCard signal={primarySignal} formatPrice={formatPrice} />
-          <OperationalStatusCard
-            signal={primarySignal}
-            provider={form.provider}
-            error={error}
-            isLoading={isLoading}
-          />
         </div>
         <div className="microMainGrid">
           <div className="opportunityChartStage">{chartSlot}</div>
@@ -130,10 +188,273 @@ export function OpportunityWorkspace({
           <ContextPanel
             signal={primarySignal}
             result={result}
+            execution={viewedOrder}
           />
           </aside>
         </div>
+        {form.provider === "mt5" && (
+          (primarySignal && (["BUY", "SELL"].includes(primarySignal.direction) || Boolean(primarySignal.planned_direction))) ||
+          orderStatuses.length > 0 ||
+          pendingOrderStatuses.length > 0
+        ) ? (
+          <OrderExecutionPanel
+            signal={primarySignal && (["BUY", "SELL"].includes(primarySignal.direction) || primarySignal.planned_direction) ? primarySignal : null}
+            preview={orderPreview}
+            execution={orderExecution}
+            statuses={orderStatuses}
+            pendingStatuses={pendingOrderStatuses}
+            error={orderError}
+            isLoading={isOrderLoading}
+            onPreview={onPreviewOrder}
+            onExecute={onExecuteOrder}
+            onClose={onCloseOrder}
+            onCloseAll={onCloseAllOrders}
+            onCancelPending={onCancelPendingOrder}
+            onReset={onResetOrder}
+            onViewOnChart={onViewOrderOnChart}
+          />
+        ) : null}
       </div>
+    </section>
+  );
+}
+
+function OrderExecutionPanel({
+  signal,
+  preview,
+  execution,
+  statuses,
+  pendingStatuses,
+  error,
+  isLoading,
+  onPreview,
+  onExecute,
+  onClose,
+  onCloseAll,
+  onCancelPending,
+  onReset,
+  onViewOnChart,
+}: {
+  signal: OpportunitySignal | null;
+  preview: OrderPreview | null;
+  execution: OrderExecution | null;
+  statuses: OrderStatus[];
+  pendingStatuses: PendingOrderStatus[];
+  error: string | null;
+  isLoading: boolean;
+  onPreview: (volume: number) => void;
+  onExecute: (volume: number) => void;
+  onClose: (positionTicket: number) => void;
+  onCloseAll: (positionTickets: number[]) => void;
+  onCancelPending: (orderTicket: number) => void;
+  onReset: () => void;
+  onViewOnChart: (status: OrderStatus) => void;
+}) {
+  const [volume, setVolume] = useState(0.01);
+  const [reasonStatus, setReasonStatus] = useState<OrderStatus | null>(null);
+  const [closeStatus, setCloseStatus] = useState<OrderStatus | null>(null);
+  const [isCloseAllOpen, setIsCloseAllOpen] = useState(false);
+  const [pendingCancelStatus, setPendingCancelStatus] = useState<PendingOrderStatus | null>(null);
+  const [isPreparationOpen, setIsPreparationOpen] = useState(true);
+
+  useEffect(() => {
+    if (execution) setIsPreparationOpen(false);
+  }, [execution]);
+
+  const accountCurrency = statuses[0]?.currency ?? "";
+  const accountTotal = statuses[0]?.account_equity;
+  const openResult = statuses.reduce((total, status) => total + (status.profit ?? 0), 0);
+  const isPendingSignal = signal?.direction === "WAIT" && Boolean(signal.planned_direction);
+  const displayedDirection = signal?.planned_direction ?? signal?.direction;
+
+  return (
+    <section className="orderExecutionPanel">
+      <div className="orderExecutionHeader">
+        <div>
+          <span>Execução na corretora</span>
+          <strong>{signal ? `${displayedDirection} ${signal.symbol}` : `${statuses.length} posição(ões) em execução`}</strong>
+        </div>
+        <span className="orderExecutionWarning">Ordem real</span>
+        {execution ? <span className="orderExecutionSuccess">Ordem enviada</span> : null}
+        {signal ? (
+          <button
+            className="orderPreparationToggle"
+            onClick={() => {
+              if (!isPreparationOpen) onReset();
+              setIsPreparationOpen((current) => !current);
+            }}
+            type="button"
+          >
+            {isPreparationOpen ? "Fechar preparação" : "Preparar nova ordem"}
+          </button>
+        ) : null}
+      </div>
+      {statuses.length > 0 ? (
+        <div className="orderAccountSummary">
+          <span>Patrimônio <strong>{accountTotal == null ? "-" : `${accountCurrency} ${accountTotal.toFixed(2)}`}</strong></span>
+          <span>Resultado aberto <strong className={openResult >= 0 ? "positive" : "negative"}>{accountCurrency} {openResult.toFixed(2)}</strong></span>
+          <button disabled={isLoading} onClick={() => setIsCloseAllOpen(true)} type="button">Fechar todas</button>
+        </div>
+      ) : null}
+      {signal && isPreparationOpen ? <section className="orderCalculationStage">
+        <strong>1. Calcular tamanho e valores</strong>
+        <div className="orderExecutionControls">
+        <label>
+          Volume em lotes
+          <input min="0.0001" onChange={(event) => setVolume(Number(event.target.value))} step="any" type="number" value={volume} />
+        </label>
+        <button disabled={isLoading || volume <= 0} onClick={() => onPreview(volume)} type="button">
+          {isLoading ? "Validando..." : isPendingSignal ? "Calcular ordem pendente" : "Calcular e revisar"}
+        </button>
+        </div>
+      </section> : null}
+      {signal && isPreparationOpen && preview ? (
+        <section className="orderSendStage">
+          <strong>2. Revisar e enviar para a corretora</strong>
+          <div className="orderPreviewGrid">
+            <RiskMetricCard label="Lote ajustado" value={preview.volume.toString()} />
+            <RiskMetricCard label="Entrada atual" value={preview.entry_price.toString()} />
+            <RiskMetricCard label="Perda no stop" value={`${preview.currency} ${preview.estimated_loss.toFixed(2)}`} tone="danger" />
+            <RiskMetricCard label="Ganho no alvo" value={`${preview.currency} ${preview.estimated_profit.toFixed(2)}`} tone="success" />
+            <RiskMetricCard label="Margem estimada" value={preview.estimated_margin == null ? "-" : `${preview.currency} ${preview.estimated_margin.toFixed(2)}`} />
+          </div>
+          <div className="orderConfirmation">
+            <span>Revise os valores antes de enviar. Esta ação cria uma ordem real.</span>
+            <button
+              className="orderSendButton"
+              disabled={isLoading || !preview.execution_enabled}
+              onClick={() => onExecute(preview.volume)}
+              type="button"
+            >
+              <Send size={16} /> {preview.order_kind === "pending" ? "Apregoar ordem pendente" : "Enviar ordem real"}
+            </button>
+          </div>
+          {!preview.execution_enabled ? <p className="orderExecutionDisabled">Execução real desabilitada no servidor.</p> : null}
+        </section>
+      ) : null}
+      {error ? <p className="orderExecutionError">{error}</p> : null}
+      {statuses.map((status) => (
+        <div className="orderTrackingPanel" key={status.position_ticket ?? status.symbol}>
+          <div><span>Ativo</span><strong>{status.direction} {status.symbol}</strong></div>
+          <div><span>Status</span><strong>{status.status === "open" ? "Posição aberta" : status.status === "closed" ? "Posição encerrada" : "Localizando posição"}</strong></div>
+          <div><span>Ticket</span><strong>{status.position_ticket ?? execution?.position_ticket ?? "-"}</strong></div>
+          <div><span>Volume</span><strong>{status.volume ?? execution?.volume ?? "-"}</strong></div>
+          <div><span>Entrada</span><strong>{status.entry_price ?? "-"}</strong></div>
+          <div><span>Preço atual</span><strong>{status.current_price ?? "-"}</strong></div>
+          <div><span>Stop loss</span><strong>{status.stop_loss ?? "-"}</strong></div>
+          <div><span>Take profit</span><strong>{status.take_profit ?? "-"}</strong></div>
+          <div className={(status.profit ?? 0) >= 0 ? "positive" : "negative"}>
+            <span>Resultado atual</span>
+            <strong>{status.currency} {(status.profit ?? 0).toFixed(2)}</strong>
+          </div>
+          <div className="orderPositionActions">
+          <button className="orderChartButton" onClick={() => onViewOnChart(status)} type="button">
+            Ver no gráfico
+          </button>
+          <button className="orderReasonButton" onClick={() => setReasonStatus(status)} type="button">Razões técnicas</button>
+          <button className="orderCloseButton" disabled={isLoading || !status.position_ticket} onClick={() => setCloseStatus(status)} type="button">Fechar posição</button>
+          </div>
+        </div>
+      ))}
+      {pendingStatuses.map((order) => (
+        <div className="pendingOrderPanel" key={order.order_ticket}>
+          <span>Ordem pendente</span>
+          <strong>{order.pending_type.replace("_", " ")} {order.symbol}</strong>
+          <span>Ticket <strong>{order.order_ticket}</strong></span>
+          <span>Volume <strong>{order.volume}</strong></span>
+          <span>Entrada <strong>{order.entry_price}</strong></span>
+          <span>Stop <strong>{order.stop_loss ?? "-"}</strong></span>
+          <span>Alvo <strong>{order.take_profit ?? "-"}</strong></span>
+          <button disabled={isLoading} onClick={() => setPendingCancelStatus(order)} type="button">Cancelar ordem</button>
+        </div>
+      ))}
+      {reasonStatus ? (
+        <div className="orderModalBackdrop" onMouseDown={() => setReasonStatus(null)} role="presentation">
+          <section aria-modal="true" className="orderModal" onMouseDown={(event) => event.stopPropagation()} role="dialog">
+            <div className="orderModalHeader">
+              <div><span>Contexto da execução</span><strong>{reasonStatus.direction} {reasonStatus.symbol}</strong></div>
+              <button aria-label="Fechar" onClick={() => setReasonStatus(null)} type="button">×</button>
+            </div>
+            <AnalysisReasonList title="Razões técnicas" items={reasonStatus.technical_reasons} emptyText="Esta ordem não possui razões técnicas registradas." />
+            <AnalysisReasonList title="Razões de risco" items={reasonStatus.risk_reasons} emptyText="Esta ordem não possui razões de risco registradas." />
+          </section>
+        </div>
+      ) : null}
+      {closeStatus ? (
+        <div className="orderModalBackdrop" onMouseDown={() => setCloseStatus(null)} role="presentation">
+          <section aria-modal="true" className="orderModal orderCloseModal" onMouseDown={(event) => event.stopPropagation()} role="dialog">
+            <div className="orderModalHeader">
+              <div><span>Confirmar fechamento</span><strong>{closeStatus.direction} {closeStatus.symbol}</strong></div>
+              <button aria-label="Cancelar" onClick={() => setCloseStatus(null)} type="button">×</button>
+            </div>
+            <p>Esta ação enviará uma ordem real para encerrar integralmente a posição de volume {closeStatus.volume}.</p>
+            <div className="orderModalActions">
+              <button onClick={() => setCloseStatus(null)} type="button">Cancelar</button>
+              <button
+                className="orderCloseConfirmButton"
+                disabled={isLoading || !closeStatus.position_ticket}
+                onClick={() => {
+                  if (closeStatus.position_ticket) onClose(closeStatus.position_ticket);
+                  setCloseStatus(null);
+                }}
+                type="button"
+              >
+                {isLoading ? "Fechando..." : "Confirmar fechamento"}
+              </button>
+            </div>
+          </section>
+        </div>
+      ) : null}
+      {isCloseAllOpen ? (
+        <div className="orderModalBackdrop" onMouseDown={() => setIsCloseAllOpen(false)} role="presentation">
+          <section aria-modal="true" className="orderModal orderCloseModal" onMouseDown={(event) => event.stopPropagation()} role="dialog">
+            <div className="orderModalHeader">
+              <div><span>Ação em lote</span><strong>Fechar todas as posições</strong></div>
+              <button aria-label="Cancelar" onClick={() => setIsCloseAllOpen(false)} type="button">×</button>
+            </div>
+            <p>Serão enviadas {statuses.length} ordens reais de fechamento, uma para cada posição aberta pelo Cortex.</p>
+            <div className="orderModalActions">
+              <button onClick={() => setIsCloseAllOpen(false)} type="button">Cancelar</button>
+              <button
+                className="orderCloseConfirmButton"
+                disabled={isLoading}
+                onClick={() => {
+                  onCloseAll(statuses.flatMap((status) => status.position_ticket ? [status.position_ticket] : []));
+                  setIsCloseAllOpen(false);
+                }}
+                type="button"
+              >
+                {isLoading ? "Fechando..." : `Fechar ${statuses.length} posições`}
+              </button>
+            </div>
+          </section>
+        </div>
+      ) : null}
+      {pendingCancelStatus ? (
+        <div className="orderModalBackdrop" onMouseDown={() => setPendingCancelStatus(null)} role="presentation">
+          <section aria-modal="true" className="orderModal orderCloseModal" onMouseDown={(event) => event.stopPropagation()} role="dialog">
+            <div className="orderModalHeader">
+              <div><span>Cancelar ordem pendente</span><strong>{pendingCancelStatus.pending_type.replace("_", " ")} {pendingCancelStatus.symbol}</strong></div>
+              <button aria-label="Fechar" onClick={() => setPendingCancelStatus(null)} type="button">×</button>
+            </div>
+            <p>A ordem ainda não foi executada. O cancelamento removerá o apregoamento do MT5.</p>
+            <div className="orderModalActions">
+              <button onClick={() => setPendingCancelStatus(null)} type="button">Voltar</button>
+              <button
+                className="orderCloseConfirmButton"
+                disabled={isLoading}
+                onClick={() => {
+                  onCancelPending(pendingCancelStatus.order_ticket);
+                  setPendingCancelStatus(null);
+                }}
+                type="button"
+              >
+                Confirmar cancelamento
+              </button>
+            </div>
+          </section>
+        </div>
+      ) : null}
     </section>
   );
 }
@@ -174,15 +495,25 @@ function MarketSummaryCard({
 
 function TradingConfigPanel({
   assets,
+  favorites,
+  favoritesEnabled,
+  strategies,
   form,
   setForm,
   isLoading,
+  onAssetSearch,
+  onToggleFavorite,
   onSubmit,
 }: {
   assets: Array<{ symbol: string; name: string; category: string }>;
+  favorites: Array<{ symbol: string; name: string; category: string; default_provider_symbol: string }>;
+  favoritesEnabled: boolean;
+  strategies: StrategyOption[];
   form: OpportunityRequest;
   setForm: Dispatch<SetStateAction<OpportunityRequest>>;
   isLoading: boolean;
+  onAssetSearch?: (query: string) => void;
+  onToggleFavorite: (asset: { symbol: string; name: string; category: string; default_provider_symbol: string }) => void;
   onSubmit: (event: FormEvent<HTMLFormElement>) => void;
 }) {
   return (
@@ -190,8 +521,12 @@ function TradingConfigPanel({
       <form className="tradingConfigForm" onSubmit={onSubmit}>
         <AssetCombobox
           assets={assets}
+          favorites={favorites}
+          favoritesEnabled={favoritesEnabled}
           value={form.symbol}
           onChange={(symbol) => setForm({ ...form, symbol })}
+          onSearch={onAssetSearch}
+          onToggleFavorite={onToggleFavorite}
         />
 
         <label className="configField">
@@ -202,6 +537,23 @@ function TradingConfigPanel({
           >
             <option value="daytrade">Day Trade</option>
             <option value="swingtrade">Swing Trade</option>
+          </select>
+        </label>
+
+        <label className="configField">
+          Estratégia
+          <select
+            value={form.strategy_id}
+            onChange={(event) => {
+              const strategyId = event.target.value;
+              const strategy = strategies.find((item) => item.id === strategyId);
+              const timeframe = strategy && !strategy.supported_timeframes.includes(form.timeframe) ? "M15" : form.timeframe;
+              setForm({ ...form, strategy_id: strategyId, timeframe: timeframe as OpportunityTimeframe });
+            }}
+          >
+            {strategies.map((strategy) => (
+              <option key={strategy.id} value={strategy.id}>{strategy.name}</option>
+            ))}
           </select>
         </label>
 
@@ -231,7 +583,7 @@ function TradingConfigPanel({
           </select>
         </label>
 
-        <button className="tradeActionButton tradingConfigSubmit" disabled={isLoading} type="submit">
+        <button className="tradeActionButton tradingConfigSubmit" disabled={isLoading || !form.symbol.trim()} type="submit">
           {isLoading ? <Loader2 size={17} /> : <Sparkles size={17} />}
           {isLoading ? "Analisando..." : "Analisar ativo"}
         </button>
@@ -240,14 +592,22 @@ function TradingConfigPanel({
   );
 }
 
-function AssetCombobox({
+export function AssetCombobox({
   assets,
+  favorites,
+  favoritesEnabled,
   value,
   onChange,
+  onSearch,
+  onToggleFavorite,
 }: {
-  assets: Array<{ symbol: string; name: string; category: string }>;
+  assets: Array<{ symbol: string; name: string; category: string; default_provider_symbol?: string }>;
+  favorites: Array<{ symbol: string; name: string; category: string; default_provider_symbol: string }>;
+  favoritesEnabled: boolean;
   value: string;
   onChange: (symbol: string) => void;
+  onSearch?: (query: string) => void;
+  onToggleFavorite: (asset: { symbol: string; name: string; category: string; default_provider_symbol: string }) => void;
 }) {
   const selectedAsset = assets.find((asset) => asset.symbol === value);
   const selectedLabel = selectedAsset ? `${selectedAsset.symbol} · ${selectedAsset.name}` : value;
@@ -259,17 +619,21 @@ function AssetCombobox({
     setQuery(selectedLabel);
   }, [selectedLabel]);
 
+  useEffect(() => {
+    if (!isOpen || query.trim().length < 2 || query === selectedLabel) return;
+    const timer = window.setTimeout(() => onSearch?.(query), 350);
+    return () => window.clearTimeout(timer);
+  }, [isOpen, onSearch, query, selectedLabel]);
+
   const filteredAssets = useMemo(() => {
     const normalizedQuery = query.trim().toLocaleLowerCase("pt-BR");
-    if (!normalizedQuery || query === selectedLabel) {
-      return assets.slice(0, 80);
-    }
+    if (normalizedQuery.length < 2 || query === selectedLabel) return favorites;
     return assets
       .filter((asset) =>
         `${asset.symbol} ${asset.name} ${asset.category}`.toLocaleLowerCase("pt-BR").includes(normalizedQuery),
       )
       .slice(0, 80);
-  }, [assets, query, selectedLabel]);
+  }, [assets, favorites, query, selectedLabel]);
 
   function selectAsset(asset: { symbol: string; name: string }) {
     onChange(asset.symbol);
@@ -326,8 +690,22 @@ function AssetCombobox({
           role="combobox"
           value={query}
         />
+        {favoritesEnabled ? <button
+          aria-label={favorites.some((asset) => asset.symbol === value) ? "Remover dos favoritos" : "Adicionar aos favoritos"}
+          className={favorites.some((asset) => asset.symbol === value) ? "assetFavoriteButton assetFavoriteButton--active" : "assetFavoriteButton"}
+          disabled={!selectedAsset}
+          onMouseDown={(event) => event.preventDefault()}
+          onClick={() => selectedAsset && onToggleFavorite({
+            ...selectedAsset,
+            default_provider_symbol: selectedAsset.default_provider_symbol ?? selectedAsset.symbol,
+          })}
+          title={favorites.some((asset) => asset.symbol === value) ? "Remover dos favoritos" : "Adicionar aos favoritos"}
+          type="button"
+        >
+          <Star size={16} />
+        </button> : null}
       </span>
-      {isOpen ? (
+      {isOpen && (favorites.length > 0 || query.trim().length >= 2) ? (
         <div className="assetComboboxMenu" id="asset-options" role="listbox">
           {filteredAssets.length > 0 ? (
             filteredAssets.map((asset, index) => (
@@ -427,10 +805,14 @@ function OperationalMetricsCard({
   signal: OpportunitySignal | null;
   formatPrice: (value: number) => string;
 }) {
+  const entryLabel = signal?.strategy_id === "smc" ? "Zona de entrada" : "Entrada";
+  const entryValue = signal?.strategy_id === "smc" && signal.entry_zone_low && signal.entry_zone_high
+    ? `${formatPrice(signal.entry_zone_low)} – ${formatPrice(signal.entry_zone_high)}`
+    : signal?.entry_price ? formatPrice(signal.entry_price) : "-";
   return (
     <section className="operationalMetricsCard">
       <div className="metricMatrix">
-        <RiskMetricCard label="Entrada" value={signal?.entry_price ? formatPrice(signal.entry_price) : "-"} />
+        <RiskMetricCard label={entryLabel} value={entryValue} />
         <RiskMetricCard label="Stop loss" value={signal?.stop_loss ? formatPrice(signal.stop_loss) : "-"} tone="danger" />
         <RiskMetricCard label="Take profit" value={signal?.take_profit ? formatPrice(signal.take_profit) : "-"} tone="success" />
         <RiskMetricCard label="Risco/retorno" value={signal?.risk_reward_ratio?.toString() ?? "-"} />
@@ -532,10 +914,20 @@ function MarketPreviewCard({
 function ContextPanel({
   signal,
   result,
+  execution,
 }: {
   signal: OpportunitySignal | null;
   result: OpportunityResult | null;
+  execution: OrderStatus | null;
 }) {
+  if (execution) {
+    return (
+      <section className="contextPanel">
+        <AnalysisReasonList title="Razões técnicas da execução" items={execution.technical_reasons} emptyText="Esta ordem não possui razões técnicas registradas." />
+        <AnalysisReasonList title="Razões de risco da execução" items={execution.risk_reasons} emptyText="Esta ordem não possui razões de risco registradas." />
+      </section>
+    );
+  }
   return (
     <section className="contextPanel">
       <AnalysisReasonList title="Razões técnicas" items={signal?.technical_reasons ?? []} emptyText="Aguardando leitura técnica." />
@@ -625,5 +1017,6 @@ function getProviderStatus(provider: OpportunityProvider, error: string | null) 
   if (provider === "mt5") return error ? "MT5 indisponível" : "MT5 conectado";
   if (error) return "Indisponível";
   if (provider === "mock") return "Preview simulado";
+  if (provider === "twelvedata") return "Twelve Data";
   return "Leitura de mercado";
 }

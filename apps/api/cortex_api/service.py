@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import os
+import re
+import time
 import uuid
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
@@ -178,10 +180,40 @@ ASSET_OPTIONS = [
         default_provider_symbol="BTC-USD",
     ),
     AssetOption(
+        symbol="BTCUSD",
+        name="Bitcoin / Dólar",
+        category="Cripto",
+        default_provider_symbol="BTC-USD",
+    ),
+    AssetOption(
         symbol="XAUUSD",
         name="Ouro spot / Dólar",
         category="Metal",
         default_provider_symbol="GC=F",
+    ),
+    AssetOption(
+        symbol="XAGUSD",
+        name="Prata / Dólar",
+        category="Metal",
+        default_provider_symbol="SI=F",
+    ),
+    AssetOption(
+        symbol="EURUSD",
+        name="Euro / Dólar",
+        category="Forex",
+        default_provider_symbol="EURUSD=X",
+    ),
+    AssetOption(
+        symbol="USDJPY",
+        name="Dólar / Iene",
+        category="Forex",
+        default_provider_symbol="JPY=X",
+    ),
+    AssetOption(
+        symbol="USDBRL",
+        name="Dólar / Real",
+        category="Forex",
+        default_provider_symbol="BRL=X",
     ),
 ]
 
@@ -215,6 +247,150 @@ RESAMPLE_RULES: dict[str, str | None] = {
 
 def get_assets() -> list[AssetOption]:
     return ASSET_OPTIONS
+
+
+_SAFE_MARKET_SYMBOL = re.compile(r"^[A-Z0-9^][A-Z0-9.^=_-]{0,29}$")
+
+
+def search_assets(query: str, limit: int = 12) -> list[AssetOption]:
+    """Search Yahoo Finance's public catalogue without broker credentials."""
+    normalized_query = query.strip()
+    if len(normalized_query) < 2:
+        return ASSET_OPTIONS[:limit]
+
+    normalized_for_match = normalized_query.upper().replace("/", "").replace(" ", "")
+    curated = [
+        asset
+        for asset in ASSET_OPTIONS
+        if normalized_for_match in asset.symbol.upper()
+        or normalized_query.casefold() in asset.name.casefold()
+    ]
+    exact_curated = [asset for asset in curated if asset.symbol == normalized_for_match]
+    if exact_curated:
+        return exact_curated[:limit]
+
+    from cortex.trading_opportunities.providers.twelve_data_provider import (
+        TwelveDataMarketDataProvider,
+        twelve_data_configured,
+    )
+
+    if twelve_data_configured():
+        provider_results = TwelveDataMarketDataProvider().search_symbols(normalized_query, limit)
+        assets = list(curated)
+        seen = {asset.symbol for asset in assets}
+        for item in provider_results:
+            symbol = item["symbol"].strip().upper()
+            if not _SAFE_MARKET_SYMBOL.fullmatch(symbol) or symbol in seen:
+                continue
+            seen.add(symbol)
+            assets.append(
+                AssetOption(
+                    symbol=symbol,
+                    name=item["name"],
+                    category=item["category"],
+                    default_provider_symbol=item["provider_symbol"],
+                )
+            )
+        return assets[:limit]
+
+    import yfinance as yf
+
+    result = yf.Search(
+        normalized_query,
+        max_results=min(max(limit, 1), 25),
+        news_count=0,
+        lists_count=0,
+        include_cb=False,
+        include_nav_links=False,
+        include_research=False,
+        include_cultural_assets=False,
+        timeout=8,
+    )
+    assets: list[AssetOption] = list(curated)
+    seen: set[str] = {asset.symbol for asset in curated}
+    supported_quote_types = {
+        "EQUITY",
+        "ETF",
+        "INDEX",
+        "FUTURE",
+        "CRYPTOCURRENCY",
+        "CURRENCY",
+        "MUTUALFUND",
+    }
+    for quote in result.quotes:
+        symbol = str(quote.get("symbol") or "").strip().upper()
+        quote_type_raw = str(quote.get("quoteType") or "").upper()
+        if (
+            not _SAFE_MARKET_SYMBOL.fullmatch(symbol)
+            or symbol in seen
+            or quote_type_raw not in supported_quote_types
+        ):
+            continue
+        seen.add(symbol)
+        quote_type = str(quote.get("typeDisp") or quote_type_raw or "Ativo")
+        assets.append(
+            AssetOption(
+                symbol=symbol,
+                name=str(quote.get("longname") or quote.get("shortname") or symbol),
+                category=quote_type.replace("_", " ").title(),
+                default_provider_symbol=symbol,
+            )
+        )
+    return assets[:limit]
+
+
+def _resolve_free_asset(symbol: str) -> AssetOption:
+    normalized_symbol = symbol.strip().upper()
+    known = next((item for item in ASSET_OPTIONS if item.symbol == normalized_symbol), None)
+    if known is not None:
+        return known
+    if not _SAFE_MARKET_SYMBOL.fullmatch(normalized_symbol):
+        raise ValueError(f"Unsupported asset: {symbol}")
+    return AssetOption(
+        symbol=normalized_symbol,
+        name=normalized_symbol,
+        category="Mercado",
+        default_provider_symbol=normalized_symbol,
+    )
+
+
+def get_free_market_tick(symbol: str) -> dict[str, str | int | float]:
+    """Return the most recent free quote for incremental chart updates."""
+    import yfinance as yf
+
+    asset = _resolve_free_asset(symbol)
+    ticker = yf.Ticker(asset.default_provider_symbol)
+    volume = 0.0
+    try:
+        price = float(ticker.fast_info["last_price"])
+        if price <= 0 or price != price:
+            raise ValueError("invalid last price")
+        try:
+            volume = float(ticker.fast_info.get("last_volume", 0) or 0)
+        except (KeyError, TypeError, ValueError):
+            volume = 0.0
+    except (AttributeError, KeyError, TypeError, ValueError):
+        frame = ticker.history(
+            period="1d",
+            interval="1m",
+            auto_adjust=False,
+            prepost=False,
+        )
+        if frame.empty:
+            raise ValueError(f"No market quote returned by yFinance for {symbol}")
+        row = frame.iloc[-1]
+        price = float(row["Close"])
+        volume = float(row.get("Volume", 0) or 0)
+
+    return {
+        "type": "tick",
+        "symbol": asset.symbol,
+        "timestamp": int(time.time() * 1000),
+        "bid": price,
+        "ask": price,
+        "last": price,
+        "volume": volume,
+    }
 
 
 def _validate_history_request(period: str, interval: str) -> tuple[str, str]:
@@ -306,9 +482,7 @@ def get_asset_history(
 
     import yfinance as yf
 
-    asset = next((item for item in ASSET_OPTIONS if item.symbol == symbol.upper()), None)
-    if asset is None:
-        raise ValueError(f"Unsupported asset: {symbol}")
+    asset = _resolve_free_asset(symbol)
 
     normalized_period, normalized_interval = _validate_history_request(period, interval)
     fetch_interval = FETCH_INTERVALS[normalized_interval]

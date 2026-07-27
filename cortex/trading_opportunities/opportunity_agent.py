@@ -6,9 +6,10 @@ import json
 from pathlib import Path
 
 from .config import DEFAULT_OPPORTUNITY_LOG_PATH
-from .providers import MarketDataProvider, MockMarketDataProvider, MT5ProviderStub, YFinanceMarketDataProvider
-from .schemas import OpportunityAnalysisResult, OpportunityRequest, OpportunitySignal
+from .providers import MarketDataProvider, MockMarketDataProvider, MT5ProviderStub, TwelveDataMarketDataProvider, YFinanceMarketDataProvider
+from .schemas import OpportunityAnalysisResult, OpportunityRequest, OpportunitySignal, Timeframe
 from .signal_engine import TradingOpportunitySignalEngine
+from .strategies.catalog import get_strategy
 
 
 class TradingOpportunityAgent:
@@ -25,8 +26,26 @@ class TradingOpportunityAgent:
 
     def analyze(self, request: OpportunityRequest) -> OpportunityAnalysisResult:
         provider = self.provider or self._provider_from_name(request.provider)
+        definition = get_strategy(request.strategy_id)
+        if request.timeframe.value not in definition.supported_timeframes:
+            raise ValueError(
+                f"A estratégia {definition.name} não suporta {request.timeframe.value}. "
+                f"Use: {', '.join(definition.supported_timeframes)}."
+            )
         bars = list(provider.get_ohlcv(request.symbol, request.timeframe, request.limit))
-        signals = self.engine.analyze(request, bars)
+        context_bars = None
+        if request.strategy_id == "smc":
+            context_timeframe = {
+                Timeframe.M1: Timeframe.M15,
+                Timeframe.M5: Timeframe.H1,
+                Timeframe.M15: Timeframe.H1,
+                Timeframe.M30: Timeframe.H4,
+                Timeframe.H1: Timeframe.H4,
+                Timeframe.H4: Timeframe.D1,
+                Timeframe.D1: Timeframe.D1,
+            }[request.timeframe]
+            context_bars = list(provider.get_ohlcv(request.symbol, context_timeframe, max(120, request.limit)))
+        signals = self.engine.analyze(request, bars, context_bars)
         result = OpportunityAnalysisResult(
             request=request,
             signals=signals,
@@ -46,6 +65,8 @@ class TradingOpportunityAgent:
             return MockMarketDataProvider()
         if name in {"yfinance", "yf"}:
             return YFinanceMarketDataProvider()
+        if name in {"twelvedata", "twelve_data"}:
+            return TwelveDataMarketDataProvider()
         if name == "mt5":
             return MT5ProviderStub()
         raise ValueError(f"Unsupported market data provider: {name}")

@@ -93,6 +93,68 @@ class MT5SessionManager:
             raise ValueError("O provider MT5 atual não oferece ticks em tempo real.")
         return provider.get_market_tick(symbol)
 
+    def preview_order(self, user: AuthUser, payload) -> dict:
+        provider = self.get_provider(user)
+        if not hasattr(provider, "preview_order"):
+            raise ValueError("A ponte MT5 atual ainda não oferece envio de ordens.")
+        return provider.preview_order(**payload.model_dump())
+
+    def execute_order(self, user: AuthUser, payload) -> dict:
+        provider = self.get_provider(user)
+        if not hasattr(provider, "execute_order"):
+            raise ValueError("A ponte MT5 atual ainda não oferece envio de ordens.")
+        return provider.execute_order(**payload.model_dump(exclude={
+            "technical_reasons",
+            "risk_reasons",
+            "analysis_generated_at",
+        }))
+
+    def get_order_status(self, user: AuthUser, symbol: str, position_ticket: int | None = None) -> dict:
+        provider = self.get_provider(user)
+        if not hasattr(provider, "get_order_status"):
+            raise ValueError("A ponte MT5 atual ainda não oferece acompanhamento de posições.")
+        return provider.get_order_status(symbol, position_ticket)
+
+    def get_open_order_statuses(self, user: AuthUser) -> list[dict]:
+        provider = self.get_provider(user)
+        if not hasattr(provider, "get_open_order_statuses"):
+            raise ValueError("A ponte MT5 atual ainda não oferece acompanhamento de posições.")
+        return provider.get_open_order_statuses()
+
+    def close_position(self, user: AuthUser, position_ticket: int) -> dict:
+        provider = self.get_provider(user)
+        if not hasattr(provider, "close_position"):
+            raise ValueError("A ponte MT5 atual ainda não oferece fechamento de posições.")
+        return provider.close_position(position_ticket)
+
+    def preview_pending_order(self, user: AuthUser, payload) -> dict:
+        provider = self.get_provider(user)
+        if not hasattr(provider, "preview_pending_order"):
+            raise ValueError("A ponte MT5 atual ainda não oferece ordens pendentes.")
+        return provider.preview_pending_order(**payload.model_dump(exclude={
+            "technical_reasons", "risk_reasons", "analysis_generated_at",
+        }))
+
+    def execute_pending_order(self, user: AuthUser, payload) -> dict:
+        provider = self.get_provider(user)
+        if not hasattr(provider, "execute_pending_order"):
+            raise ValueError("A ponte MT5 atual ainda não oferece ordens pendentes.")
+        return provider.execute_pending_order(**payload.model_dump(exclude={
+            "technical_reasons", "risk_reasons", "analysis_generated_at",
+        }))
+
+    def list_pending_orders(self, user: AuthUser) -> list[dict]:
+        provider = self.get_provider(user)
+        if not hasattr(provider, "list_pending_orders"):
+            raise ValueError("A ponte MT5 atual ainda não oferece ordens pendentes.")
+        return provider.list_pending_orders()
+
+    def cancel_pending_order(self, user: AuthUser, order_ticket: int) -> dict:
+        provider = self.get_provider(user)
+        if not hasattr(provider, "cancel_pending_order"):
+            raise ValueError("A ponte MT5 atual ainda não oferece cancelamento de ordens pendentes.")
+        return provider.cancel_pending_order(order_ticket)
+
     def _persist_connection(self, user: AuthUser, payload: MT5ConnectRequest, account: dict) -> None:
         save_broker_connection(
             user_id=user.id,

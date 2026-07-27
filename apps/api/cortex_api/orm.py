@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from datetime import datetime
 
-from sqlalchemy import Boolean, DateTime, Float, ForeignKey, Integer, Text
+from sqlalchemy import Boolean, DateTime, Float, ForeignKey, Integer, Text, UniqueConstraint
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
 
@@ -28,6 +28,45 @@ class UserORM(Base):
         back_populates="user",
         cascade="all, delete-orphan",
     )
+class FavoriteAssetORM(Base):
+    __tablename__ = "ativos_favoritos"
+    __table_args__ = (UniqueConstraint("user_id", "symbol", name="uq_favorite_asset_user_symbol"),)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    user_id: Mapped[str] = mapped_column(Text, ForeignKey("usuarios.id", ondelete="CASCADE"), nullable=False, index=True)
+    symbol: Mapped[str] = mapped_column(Text, nullable=False)
+    name: Mapped[str] = mapped_column(Text, nullable=False)
+    category: Mapped[str] = mapped_column(Text, nullable=False)
+    provider_symbol: Mapped[str] = mapped_column(Text, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, default=datetime.now)
+
+
+class BrokerFavoriteAssetORM(Base):
+    __tablename__ = "ativos_favoritos_corretora"
+    __table_args__ = (UniqueConstraint("user_id", "symbol", name="uq_broker_favorite_user_symbol"),)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    user_id: Mapped[str] = mapped_column(Text, ForeignKey("usuarios.id", ondelete="CASCADE"), nullable=False, index=True)
+    symbol: Mapped[str] = mapped_column(Text, nullable=False)
+    name: Mapped[str] = mapped_column(Text, nullable=False)
+    category: Mapped[str] = mapped_column(Text, nullable=False)
+    provider_symbol: Mapped[str] = mapped_column(Text, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, default=datetime.now)
+
+
+class ExecutedOpportunityORM(Base):
+    __tablename__ = "oportunidades_executadas"
+    __table_args__ = (UniqueConstraint("user_id", "position_ticket", name="uq_executed_opportunity_user_ticket"),)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    user_id: Mapped[str] = mapped_column(Text, ForeignKey("usuarios.id", ondelete="CASCADE"), nullable=False, index=True)
+    position_ticket: Mapped[int] = mapped_column(Integer, nullable=False)
+    symbol: Mapped[str] = mapped_column(Text, nullable=False)
+    direction: Mapped[str] = mapped_column(Text, nullable=False)
+    technical_reasons_json: Mapped[str] = mapped_column(Text, nullable=False, default="[]")
+    risk_reasons_json: Mapped[str] = mapped_column(Text, nullable=False, default="[]")
+    analysis_generated_at: Mapped[str | None] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, default=datetime.now)
 
 
 class BrokerConnectionORM(Base):
