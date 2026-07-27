@@ -25,6 +25,9 @@ AUTH_COOKIE_NAME = "cortex_session"
 TOKEN_TYPE = "access"
 ACCESS_TOKEN_MINUTES = int(os.getenv("CORTEX_ACCESS_TOKEN_MINUTES", "120"))
 COOKIE_SECURE = os.getenv("CORTEX_AUTH_COOKIE_SECURE", "false").lower() == "true"
+COOKIE_SAMESITE = os.getenv("CORTEX_AUTH_COOKIE_SAMESITE", "lax").strip().lower()
+if COOKIE_SAMESITE not in {"lax", "strict", "none"}:
+    COOKIE_SAMESITE = "lax"
 JWT_SECRET = os.getenv("CORTEX_AUTH_SECRET") or os.getenv("SECRET_KEY") or "dev-cortex-auth-secret-change-me"
 PASSWORD_ITERATIONS = int(os.getenv("CORTEX_PASSWORD_ITERATIONS", "260000"))
 RATE_LIMIT_WINDOW_SECONDS = int(os.getenv("CORTEX_AUTH_RATE_LIMIT_WINDOW_SECONDS", "60"))
@@ -138,14 +141,20 @@ def set_auth_cookie(response: Response, token: str) -> None:
         token,
         httponly=True,
         secure=COOKIE_SECURE,
-        samesite="lax",
+        samesite=COOKIE_SAMESITE,
         max_age=ACCESS_TOKEN_MINUTES * 60,
         path="/",
     )
 
 
 def clear_auth_cookie(response: Response) -> None:
-    response.delete_cookie(AUTH_COOKIE_NAME, path="/", samesite="lax", secure=COOKIE_SECURE, httponly=True)
+    response.delete_cookie(
+        AUTH_COOKIE_NAME,
+        path="/",
+        samesite=COOKIE_SAMESITE,
+        secure=COOKIE_SECURE,
+        httponly=True,
+    )
 
 
 def register_user(payload: RegisterRequest) -> AuthUser:

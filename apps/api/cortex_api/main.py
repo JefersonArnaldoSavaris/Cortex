@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import os
 import time
 
 from fastapi import Depends, FastAPI, HTTPException, Query, Request, Response, WebSocket, WebSocketDisconnect, status
@@ -69,6 +70,12 @@ from .service import analysis_service, get_asset_history, get_assets, get_free_m
 opportunity_agent = TradingOpportunityAgent()
 
 
+def _cors_origins() -> list[str]:
+    configured = os.getenv("CORTEX_CORS_ORIGINS", "")
+    origins = [origin.strip().rstrip("/") for origin in configured.split(",") if origin.strip()]
+    return origins or ["http://localhost:3000", "http://127.0.0.1:3000"]
+
+
 app = FastAPI(
     title="Cortex API",
     version="0.1.0",
@@ -82,7 +89,7 @@ def startup() -> None:
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000", "http://127.0.0.1:3000"],
+    allow_origins=_cors_origins(),
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

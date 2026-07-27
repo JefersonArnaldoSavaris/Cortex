@@ -170,7 +170,20 @@ Configure um segredo forte para os tokens de sessão:
 
 ```dotenv
 CORTEX_AUTH_SECRET=
+CORTEX_AUTH_COOKIE_SECURE=false
+CORTEX_AUTH_COOKIE_SAMESITE=lax
 ```
+
+Quando frontend e API estiverem em domínios HTTPS diferentes, use:
+
+```dotenv
+CORTEX_AUTH_COOKIE_SECURE=true
+CORTEX_AUTH_COOKIE_SAMESITE=none
+CORTEX_CORS_ORIGINS=https://seu-frontend.vercel.app
+```
+
+`CORTEX_CORS_ORIGINS` aceita múltiplas origens separadas por vírgula. Informe
+origens exatas, sem caminho, e não use `*` com autenticação por cookie.
 
 ### MetaTrader 5
 
@@ -227,6 +240,39 @@ Por padrão, o frontend usa `http://localhost:8000`. Para alterar:
 ```dotenv
 NEXT_PUBLIC_CORTEX_API_URL=http://127.0.0.1:8000
 ```
+
+## Deploy na Vercel
+
+Use dois projetos Vercel conectados ao mesmo repositório:
+
+### Frontend
+
+- Root Directory: `apps/web`
+- Framework Preset: Next.js
+- Production Branch: `main`
+- `NEXT_PUBLIC_CORTEX_API_URL=https://seu-backend.vercel.app`
+
+### API
+
+- Root Directory: raiz do repositório
+- Framework Preset: Other
+- Production Branch: `main`
+- entrypoint: `api/index.py`
+
+O arquivo `vercel.json` encaminha as rotas para a aplicação FastAPI. Configure
+no projeto da API, no mínimo:
+
+```dotenv
+CORTEX_DATABASE_URL=postgresql://...
+CORTEX_AUTH_SECRET=...
+CORTEX_AUTH_COOKIE_SECURE=true
+CORTEX_AUTH_COOKIE_SAMESITE=none
+CORTEX_CORS_ORIGINS=https://seu-frontend.vercel.app
+```
+
+Adicione também as chaves dos provedores utilizados. O terminal MetaTrader 5
+não executa dentro do runtime Linux da Vercel; para MT5, configure
+`CORTEX_MT5_BRIDGE_URL` apontando para um bridge Windows acessível pela API.
 
 ## Docker
 
