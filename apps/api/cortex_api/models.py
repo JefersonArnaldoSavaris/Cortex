@@ -110,6 +110,112 @@ class MT5StatusResponse(BaseModel):
     message: str
 
 
+class MT5Symbol(BaseModel):
+    symbol: str
+    name: str
+    category: str = "Corretora"
+    path: str | None = None
+    currency_base: str | None = None
+    currency_profit: str | None = None
+    visible: bool = False
+
+
+class MT5SymbolsResponse(BaseModel):
+    symbols: list[MT5Symbol]
+
+
+class OrderPreviewRequest(BaseModel):
+    symbol: str = Field(min_length=1, max_length=64)
+    direction: Literal["BUY", "SELL"]
+    volume: float = Field(gt=0)
+    stop_loss: float = Field(gt=0)
+    take_profit: float = Field(gt=0)
+
+
+class OrderPreviewResponse(BaseModel):
+    symbol: str
+    direction: Literal["BUY", "SELL"]
+    volume: float
+    requested_volume: float
+    entry_price: float
+    stop_loss: float
+    take_profit: float
+    estimated_loss: float
+    estimated_profit: float
+    estimated_margin: float | None = None
+    currency: str
+    volume_min: float
+    volume_max: float
+    volume_step: float
+    execution_enabled: bool
+    check_message: str
+    order_kind: Literal["market", "pending"] = "market"
+    pending_type: Literal["BUY_LIMIT", "BUY_STOP", "SELL_LIMIT", "SELL_STOP"] | None = None
+
+
+class OrderExecuteRequest(OrderPreviewRequest):
+    technical_reasons: list[str] = Field(default_factory=list, max_length=20)
+    risk_reasons: list[str] = Field(default_factory=list, max_length=20)
+    analysis_generated_at: str | None = None
+
+
+class PendingOrderRequest(OrderExecuteRequest):
+    entry_price: float = Field(gt=0)
+
+
+class OrderExecutionResponse(BaseModel):
+    order_ticket: int | None = None
+    deal_ticket: int | None = None
+    retcode: int
+    message: str
+    executed_price: float | None = None
+    volume: float
+    position_ticket: int | None = None
+
+
+class OrderCloseRequest(BaseModel):
+    position_ticket: int = Field(gt=0)
+
+
+class PendingOrderCancelRequest(BaseModel):
+    order_ticket: int = Field(gt=0)
+
+
+class PendingOrderStatusResponse(BaseModel):
+    order_ticket: int
+    symbol: str
+    direction: Literal["BUY", "SELL"]
+    pending_type: Literal["BUY_LIMIT", "BUY_STOP", "SELL_LIMIT", "SELL_STOP"]
+    volume: float
+    entry_price: float
+    stop_loss: float | None = None
+    take_profit: float | None = None
+    created_at: datetime | None = None
+
+
+class OrderStatusResponse(BaseModel):
+    status: Literal["open", "closed", "not_found"]
+    symbol: str
+    position_ticket: int | None = None
+    direction: Literal["BUY", "SELL"] | None = None
+    volume: float | None = None
+    entry_price: float | None = None
+    current_price: float | None = None
+    stop_loss: float | None = None
+    take_profit: float | None = None
+    profit: float | None = None
+    stop_result: float | None = None
+    target_result: float | None = None
+    swap: float | None = None
+    currency: str
+    account_balance: float | None = None
+    account_equity: float | None = None
+    opened_at: datetime | None = None
+    technical_reasons: list[str] = Field(default_factory=list)
+    risk_reasons: list[str] = Field(default_factory=list)
+    analysis_generated_at: str | None = None
+
+
 class AnalysisRequest(BaseModel):
     ticker: str = Field(default="SPY", min_length=1, max_length=32, examples=["SPY"])
     analysis_date: str = Field(

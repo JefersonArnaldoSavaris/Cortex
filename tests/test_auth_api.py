@@ -55,6 +55,23 @@ def test_register_user(auth_modules):
     assert user.status == "trial"
     assert not hasattr(user, "password_hash")
 
+    from apps.api.cortex_api.favorite_repository import list_favorites
+
+    assert [asset.symbol for asset in list_favorites(user.id)] == ["XAUUSD", "BTCUSD", "EURUSD"]
+
+
+@pytest.mark.unit
+def test_favorites_are_isolated_by_user(auth_modules):
+    from apps.api.cortex_api.favorite_repository import delete_favorite, list_favorites
+
+    first = _register(auth_modules, email="first@example.com")
+    second = _register(auth_modules, email="second@example.com")
+
+    delete_favorite(first.id, "BTCUSD")
+
+    assert [asset.symbol for asset in list_favorites(first.id)] == ["XAUUSD", "EURUSD"]
+    assert [asset.symbol for asset in list_favorites(second.id)] == ["XAUUSD", "BTCUSD", "EURUSD"]
+
 
 @pytest.mark.unit
 def test_login_valid(auth_modules):
@@ -165,4 +182,3 @@ def test_forgot_password_returns_safe_message(auth_modules):
     )
 
     assert "enviaremos instruções" in response.message
-

@@ -1,26 +1,47 @@
 from __future__ import annotations
 
-from fastapi import Depends, FastAPI, HTTPException, Request, Response
+import asyncio
+import time
+
+from fastapi import Depends, FastAPI, HTTPException, Query, Request, Response, WebSocket, WebSocketDisconnect, status
 from fastapi.middleware.cors import CORSMiddleware
 from cortex.trading_opportunities import OpportunityRequest, TradingOpportunityAgent
+from cortex.trading_opportunities.strategies import list_strategies
+from cortex.trading_opportunities.providers import TwelveDataMarketDataProvider
+from cortex.trading_opportunities.providers.twelve_data_provider import (
+    stream_twelve_data_ticks,
+    twelve_data_configured,
+)
 from cortex.trading_opportunities.schemas import OpportunityAnalysisResult
 
 from .repository import init_db
 from .auth import (
     authenticate_user,
+    AUTH_COOKIE_NAME,
     clear_auth_cookie,
     enforce_auth_rate_limit,
     get_current_user,
+    get_user_from_token,
     register_user,
     request_password_reset,
     set_auth_cookie,
 )
 from .mt5 import mt5_sessions
+from .execution_repository import execution_contexts_by_ticket, save_execution_context
+from .favorite_repository import (
+    delete_broker_favorite,
+    delete_favorite,
+    list_broker_favorites,
+    list_favorites,
+    save_broker_favorite,
+    save_favorite,
+)
 from .models import (
     AnalysisCreateResponse,
     AnalysisListResponse,
     AnalysisRequest,
     AssetHistoryResponse,
+    AssetOption,
     ConfigOptionsResponse,
     ReportResponse,
     AuthResponse,
@@ -30,9 +51,19 @@ from .models import (
     MessageResponse,
     MT5ConnectRequest,
     MT5StatusResponse,
+    MT5SymbolsResponse,
+    OrderExecuteRequest,
+    OrderCloseRequest,
+    PendingOrderCancelRequest,
+    PendingOrderRequest,
+    PendingOrderStatusResponse,
+    OrderExecutionResponse,
+    OrderStatusResponse,
+    OrderPreviewRequest,
+    OrderPreviewResponse,
     RegisterRequest,
 )
-from .service import analysis_service, get_asset_history, get_assets
+from .service import analysis_service, get_asset_history, get_assets, get_free_market_tick, search_assets
 
 
 opportunity_agent = TradingOpportunityAgent()
@@ -110,15 +141,98 @@ def list_assets(current_user: AuthUser = Depends(get_current_user)):
     return {"assets": get_assets()}
 
 
+@app.get("/favorites")
+def favorites_list(current_user: AuthUser = Depends(get_current_user)):
+    return {"assets": list_favorites(current_user.id)}
+
+
+@app.put("/favorites/{symbol}")
+def favorite_save(
+    symbol: str,
+    asset: AssetOption,
+    current_user: AuthUser = Depends(get_current_user),
+):
+    if symbol.strip().upper() != asset.symbol.strip().upper():
+        raise HTTPException(status_code=422, detail="O símbolo da URL não corresponde ao ativo informado.")
+    return {"asset": save_favorite(current_user.id, asset)}
+
+
+@app.delete("/favorites/{symbol}", response_model=MessageResponse)
+def favorite_delete(
+    symbol: str,
+    current_user: AuthUser = Depends(get_current_user),
+) -> MessageResponse:
+    delete_favorite(current_user.id, symbol)
+    return MessageResponse(message="Ativo removido dos favoritos.")
+
+
+@app.get("/favorites/mt5/list")
+def broker_favorites_list(current_user: AuthUser = Depends(get_current_user)):
+    return {"assets": list_broker_favorites(current_user.id)}
+
+
+@app.put("/favorites/mt5/{symbol}")
+def broker_favorite_save(
+    symbol: str,
+    asset: AssetOption,
+    current_user: AuthUser = Depends(get_current_user),
+):
+    if symbol.strip() != asset.symbol.strip():
+        raise HTTPException(status_code=422, detail="O símbolo da URL não corresponde ao ativo informado.")
+    return {"asset": save_broker_favorite(current_user.id, asset)}
+
+
+@app.delete("/favorites/mt5/{symbol}", response_model=MessageResponse)
+def broker_favorite_delete(
+    symbol: str,
+    current_user: AuthUser = Depends(get_current_user),
+) -> MessageResponse:
+    delete_broker_favorite(current_user.id, symbol)
+    return MessageResponse(message="Ativo da corretora removido dos favoritos.")
+
+
+@app.get("/assets/search")
+def asset_search(
+    query: str = "",
+    limit: int = 12,
+    current_user: AuthUser = Depends(get_current_user),
+):
+    try:
+        return {"assets": search_assets(query, min(max(limit, 1), 25))}
+    except Exception as exc:
+        raise HTTPException(
+            status_code=502,
+            detail=f"Não foi possível pesquisar ativos no provedor gratuito: {exc}",
+        ) from exc
+
+
 @app.get("/assets/{symbol}/history", response_model=AssetHistoryResponse)
 def asset_history(
     symbol: str,
     period: str = "6mo",
     interval: str = "1d",
+    provider: str = "yfinance",
     current_user: AuthUser = Depends(get_current_user),
 ) -> AssetHistoryResponse:
     try:
+        if provider == "mt5":
+            return get_asset_history(symbol, period, interval, mt5_provider=mt5_sessions.get_provider(current_user))
+        if provider == "twelvedata" and twelve_data_configured():
+            return get_asset_history(symbol, period, interval, mt5_provider=TwelveDataMarketDataProvider())
         return get_asset_history(symbol, period, interval)
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+
+@app.get("/assets/{symbol}/tick")
+def asset_tick(
+    symbol: str,
+    current_user: AuthUser = Depends(get_current_user),
+):
+    try:
+        if twelve_data_configured():
+            return TwelveDataMarketDataProvider().get_current_tick(symbol)
+        return get_free_market_tick(symbol)
     except ValueError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
 
@@ -139,11 +253,18 @@ def analyze_opportunity(
     try:
         if request.provider == "mt5" and isinstance(current_user, AuthUser):
             return TradingOpportunityAgent(provider=mt5_sessions.get_provider(current_user)).analyze(request)
+        if request.provider == "twelvedata" and not twelve_data_configured():
+            request.provider = "yfinance"
         return opportunity_agent.analyze(request)
     except NotImplementedError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+
+@app.get("/opportunities/strategies")
+def opportunity_strategies(current_user: AuthUser = Depends(get_current_user)):
+    return {"strategies": list_strategies()}
 
 
 @app.get("/analyses", response_model=AnalysisListResponse)
@@ -186,3 +307,213 @@ def mt5_connect(
 @app.post("/integrations/mt5/disconnect", response_model=MT5StatusResponse)
 def mt5_disconnect(current_user: AuthUser = Depends(get_current_user)) -> MT5StatusResponse:
     return mt5_sessions.disconnect(current_user)
+
+
+@app.get("/integrations/mt5/symbols", response_model=MT5SymbolsResponse)
+def mt5_symbols(
+    query: str = "",
+    limit: int = Query(default=500, ge=1, le=5000),
+    current_user: AuthUser = Depends(get_current_user),
+) -> MT5SymbolsResponse:
+    try:
+        return MT5SymbolsResponse(symbols=mt5_sessions.list_symbols(current_user, query=query, limit=limit))
+    except (ConnectionError, RuntimeError, ValueError) as exc:
+        raise HTTPException(status_code=502, detail=str(exc)) from exc
+
+
+@app.post("/orders/preview", response_model=OrderPreviewResponse)
+def order_preview(
+    payload: OrderPreviewRequest,
+    current_user: AuthUser = Depends(get_current_user),
+) -> OrderPreviewResponse:
+    try:
+        return OrderPreviewResponse.model_validate(mt5_sessions.preview_order(current_user, payload))
+    except (ConnectionError, PermissionError, RuntimeError, ValueError) as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+
+@app.post("/orders/pending/preview", response_model=OrderPreviewResponse)
+def pending_order_preview(
+    payload: PendingOrderRequest,
+    current_user: AuthUser = Depends(get_current_user),
+) -> OrderPreviewResponse:
+    try:
+        return OrderPreviewResponse.model_validate(mt5_sessions.preview_pending_order(current_user, payload))
+    except (ConnectionError, PermissionError, RuntimeError, ValueError) as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+
+@app.post("/orders/pending/execute", response_model=OrderExecutionResponse)
+def pending_order_execute(
+    payload: PendingOrderRequest,
+    current_user: AuthUser = Depends(get_current_user),
+) -> OrderExecutionResponse:
+    try:
+        result = OrderExecutionResponse.model_validate(mt5_sessions.execute_pending_order(current_user, payload))
+        if result.order_ticket is not None:
+            save_execution_context(
+                user_id=current_user.id,
+                position_ticket=result.order_ticket,
+                symbol=payload.symbol,
+                direction=payload.direction,
+                technical_reasons=payload.technical_reasons,
+                risk_reasons=payload.risk_reasons,
+                analysis_generated_at=payload.analysis_generated_at,
+            )
+        return result
+    except PermissionError as exc:
+        raise HTTPException(status_code=403, detail=str(exc)) from exc
+    except (ConnectionError, RuntimeError, ValueError) as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+
+@app.get("/orders/pending", response_model=list[PendingOrderStatusResponse])
+def pending_orders(current_user: AuthUser = Depends(get_current_user)) -> list[PendingOrderStatusResponse]:
+    try:
+        return [
+            PendingOrderStatusResponse.model_validate(item)
+            for item in mt5_sessions.list_pending_orders(current_user)
+        ]
+    except (ConnectionError, RuntimeError, ValueError) as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+
+@app.post("/orders/pending/cancel", response_model=OrderExecutionResponse)
+def pending_order_cancel(
+    payload: PendingOrderCancelRequest,
+    current_user: AuthUser = Depends(get_current_user),
+) -> OrderExecutionResponse:
+    try:
+        return OrderExecutionResponse.model_validate(
+            mt5_sessions.cancel_pending_order(current_user, payload.order_ticket)
+        )
+    except PermissionError as exc:
+        raise HTTPException(status_code=403, detail=str(exc)) from exc
+    except (ConnectionError, RuntimeError, ValueError) as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+
+@app.post("/orders/execute", response_model=OrderExecutionResponse)
+def order_execute(
+    payload: OrderExecuteRequest,
+    current_user: AuthUser = Depends(get_current_user),
+) -> OrderExecutionResponse:
+    try:
+        result = OrderExecutionResponse.model_validate(mt5_sessions.execute_order(current_user, payload))
+        if result.position_ticket is not None:
+            save_execution_context(
+                user_id=current_user.id,
+                position_ticket=result.position_ticket,
+                symbol=payload.symbol,
+                direction=payload.direction,
+                technical_reasons=payload.technical_reasons,
+                risk_reasons=payload.risk_reasons,
+                analysis_generated_at=payload.analysis_generated_at,
+            )
+        return result
+    except PermissionError as exc:
+        raise HTTPException(status_code=403, detail=str(exc)) from exc
+    except (ConnectionError, RuntimeError, ValueError) as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+
+@app.post("/orders/close", response_model=OrderExecutionResponse)
+def order_close(
+    payload: OrderCloseRequest,
+    current_user: AuthUser = Depends(get_current_user),
+) -> OrderExecutionResponse:
+    try:
+        return OrderExecutionResponse.model_validate(
+            mt5_sessions.close_position(current_user, payload.position_ticket)
+        )
+    except PermissionError as exc:
+        raise HTTPException(status_code=403, detail=str(exc)) from exc
+    except (ConnectionError, RuntimeError, ValueError) as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+
+@app.get("/orders/status", response_model=OrderStatusResponse)
+def order_status(
+    symbol: str,
+    position_ticket: int | None = None,
+    current_user: AuthUser = Depends(get_current_user),
+) -> OrderStatusResponse:
+    try:
+        return OrderStatusResponse.model_validate(
+            mt5_sessions.get_order_status(current_user, symbol, position_ticket)
+        )
+    except (ConnectionError, RuntimeError, ValueError) as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+
+@app.get("/orders/open", response_model=list[OrderStatusResponse])
+def open_orders(
+    current_user: AuthUser = Depends(get_current_user),
+) -> list[OrderStatusResponse]:
+    try:
+        statuses = mt5_sessions.get_open_order_statuses(current_user)
+        tickets = [int(item["position_ticket"]) for item in statuses if item.get("position_ticket")]
+        contexts = execution_contexts_by_ticket(current_user.id, tickets)
+        return [
+            OrderStatusResponse.model_validate({
+                **item,
+                **(contexts.get(int(item["position_ticket"]), {}) if item.get("position_ticket") else {}),
+            })
+            for item in statuses
+        ]
+    except (ConnectionError, RuntimeError, ValueError) as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+
+@app.websocket("/ws/market-data")
+async def market_data_stream(websocket: WebSocket, symbol: str, provider: str = "mt5") -> None:
+    token = websocket.cookies.get(AUTH_COOKIE_NAME)
+    if not token:
+        await websocket.close(code=status.WS_1008_POLICY_VIOLATION, reason="Autenticação necessária.")
+        return
+    try:
+        user = get_user_from_token(token)
+        if provider == "mt5":
+            mt5_sessions.get_provider(user)
+    except HTTPException:
+        await websocket.close(code=status.WS_1008_POLICY_VIOLATION, reason="Sessão inválida.")
+        return
+    except ValueError as exc:
+        await websocket.close(code=status.WS_1008_POLICY_VIOLATION, reason=str(exc))
+        return
+
+    await websocket.accept()
+    if provider != "mt5" and twelve_data_configured():
+        try:
+            async for tick in stream_twelve_data_ticks(symbol):
+                await websocket.send_json(tick)
+        except WebSocketDisconnect:
+            return
+        except Exception as exc:
+            await websocket.send_json({"type": "error", "message": str(exc)})
+            await websocket.close(code=status.WS_1011_INTERNAL_ERROR)
+        return
+
+    last_signature: tuple | None = None
+    last_heartbeat = 0.0
+    try:
+        while True:
+            if provider == "mt5":
+                tick = await asyncio.to_thread(mt5_sessions.get_tick, user, symbol)
+            else:
+                tick = await asyncio.to_thread(get_free_market_tick, symbol)
+            signature = (tick.get("timestamp"), tick.get("bid"), tick.get("ask"), tick.get("last"), tick.get("volume"))
+            now = time.monotonic()
+            if signature != last_signature:
+                await websocket.send_json({"type": "tick", **tick})
+                last_signature = signature
+                last_heartbeat = now
+            elif now - last_heartbeat >= 10:
+                await websocket.send_json({"type": "heartbeat", "timestamp": int(time.time() * 1000)})
+                last_heartbeat = now
+            await asyncio.sleep(0.5 if provider == "mt5" else 1.0)
+    except WebSocketDisconnect:
+        return
+    except Exception as exc:
+        await websocket.send_json({"type": "error", "message": str(exc)})
+        await websocket.close(code=status.WS_1011_INTERNAL_ERROR)

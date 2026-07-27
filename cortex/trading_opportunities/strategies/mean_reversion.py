@@ -13,16 +13,16 @@ def mean_reversion_candidate(snapshot: TechnicalSnapshot) -> SetupCandidate:
     if snapshot.rsi <= 30:
         direction = Direction.BUY
         score += 0.35
-        reasons.append("RSI is oversold, suggesting a possible mean-reversion bounce.")
+        reasons.append("O RSI está sobrevendido, sugerindo uma possível recuperação por reversão à média.")
     elif snapshot.rsi >= 70:
         direction = Direction.SELL
         score += 0.35
-        reasons.append("RSI is overbought, suggesting a possible mean-reversion fade.")
+        reasons.append("O RSI está sobrecomprado, sugerindo uma possível correção por reversão à média.")
     else:
-        reasons.append("RSI is not at a mean-reversion extreme.")
+        reasons.append("O RSI não está em um extremo favorável à reversão à média.")
 
     if snapshot.trend == "sideways" and direction != Direction.WAIT:
         score += 0.1
-        reasons.append("Sideways trend improves mean-reversion context.")
+        reasons.append("A tendência lateral favorece o contexto de reversão à média.")
 
     return SetupCandidate(name="mean_reversion", direction=direction, score=min(score, 1), technical_reasons=reasons)

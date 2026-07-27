@@ -16,6 +16,7 @@ from cortex.trading_opportunities.schemas import (
     Timeframe,
 )
 from cortex.trading_opportunities.signal_engine import TradingOpportunitySignalEngine
+from cortex.trading_opportunities.strategies import list_strategies
 
 
 def make_snapshot(**overrides):
@@ -204,9 +205,39 @@ def test_mt5_stub_never_places_real_orders(monkeypatch):
 
 
 @pytest.mark.unit
+def test_strategy_catalog_exposes_classic_and_smc():
+    strategies = {item["id"]: item for item in list_strategies()}
+
+    assert "classic_auto" in strategies
+    assert "smc" in strategies
+    assert strategies["smc"]["supported_timeframes"] == ["M1", "M5", "M15", "M30", "H1", "H4", "D1"]
+    assert "H1" in strategies["smc"]["context_timeframes"]
+
+
+@pytest.mark.unit
+def test_smc_analysis_returns_projected_zone_and_auditable_context():
+    request = OpportunityRequest(
+        symbol="SPY",
+        provider="mock",
+        strategy_id="smc",
+        timeframe="M15",
+        limit=160,
+    )
+    signal = TradingOpportunityAgent(log_path=None).analyze(request).signals[0]
+
+    assert signal.strategy_id == "smc"
+    assert signal.entry_zone_low is not None
+    assert signal.entry_zone_high is not None
+    assert signal.entry_zone_low <= signal.entry_price <= signal.entry_zone_high
+    assert signal.stop_loss is not None
+    assert signal.take_profit is not None
+    assert any("contexto superior" in reason for reason in signal.technical_reasons)
+
+
+@pytest.mark.unit
 def test_agent_does_not_need_live_trading_and_can_skip_audit_log():
     request = OpportunityRequest(symbol="SPY", provider="mock", max_signals=1)
     result = TradingOpportunityAgent(log_path=None).analyze(request)
 
     assert result.signals
-    assert "No real order execution" in " ".join(result.signals[0].warnings)
+    assert "não executa ordens reais" in " ".join(result.signals[0].warnings)

@@ -13,16 +13,16 @@ def pullback_candidate(snapshot: TechnicalSnapshot) -> SetupCandidate:
     if snapshot.pullback == "bullish_sma_retest":
         direction = Direction.BUY
         score += 0.35
-        reasons.append("Bullish trend retested the fast moving average.")
+        reasons.append("A tendência de alta voltou a testar a média móvel rápida.")
     elif snapshot.pullback == "bearish_sma_retest":
         direction = Direction.SELL
         score += 0.35
-        reasons.append("Bearish trend retested the fast moving average.")
+        reasons.append("A tendência de baixa voltou a testar a média móvel rápida.")
     else:
-        reasons.append("No clean moving-average pullback was detected.")
+        reasons.append("Nenhum pullback claro na média móvel foi detectado.")
 
     if snapshot.candle_pattern and direction != Direction.WAIT:
         score += 0.1
-        reasons.append(f"Price action pattern detected: {snapshot.candle_pattern}.")
+        reasons.append(f"Padrão de ação do preço detectado: {snapshot.candle_pattern}.")
 
     return SetupCandidate(name="pullback", direction=direction, score=min(score, 1), technical_reasons=reasons)

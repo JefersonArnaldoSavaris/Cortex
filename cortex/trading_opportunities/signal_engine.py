@@ -19,19 +19,27 @@ from .strategies import (
     pullback_candidate,
     trend_following_candidate,
 )
+from .strategies.smc import analyze_smc
 
 
 BASE_WARNINGS = [
-    "Educational technical signal only; not financial advice.",
-    "Human validation is required before any trade decision.",
-    "No real order execution is performed by Cortex Trading Opportunities.",
+    "Sinal técnico apenas para fins educacionais; não constitui recomendação financeira.",
+    "É necessária validação humana antes de qualquer decisão de operação.",
+    "O Cortex não executa ordens reais neste módulo de oportunidades.",
 ]
 
 
 class TradingOpportunitySignalEngine:
     """Generate structured preliminary signals from OHLCV data."""
 
-    def analyze(self, request: OpportunityRequest, bars: Sequence[OHLCVBar]) -> list[OpportunitySignal]:
+    def analyze(
+        self,
+        request: OpportunityRequest,
+        bars: Sequence[OHLCVBar],
+        context_bars: Sequence[OHLCVBar] | None = None,
+    ) -> list[OpportunitySignal]:
+        if request.strategy_id == "smc":
+            return [analyze_smc(request, bars, context_bars or bars)]
         snapshot = compute_technical_snapshot(bars)
         latest_price = bars[-1].close
         candidates = self._rank_candidates(
@@ -48,7 +56,7 @@ class TradingOpportunitySignalEngine:
             for candidate in candidates[: request.max_signals]
         ]
         if not signals:
-            signals.append(self._build_wait_signal(request, "no_setup", ["No setup candidate could be evaluated."]))
+            signals.append(self._build_wait_signal(request, "sem_setup", ["Nenhum setup pôde ser avaliado."]))
         return signals
 
     def _rank_candidates(self, candidates: Sequence[SetupCandidate]) -> list[SetupCandidate]:
@@ -58,10 +66,10 @@ class TradingOpportunitySignalEngine:
             return ranked
 
         avoid = SetupCandidate(
-            name="avoid_low_quality_market",
+            name="evitar_mercado_de_baixa_qualidade",
             direction=Direction.AVOID,
             score=0.15,
-            technical_reasons=["No directional setup met the minimum quality threshold."],
+            technical_reasons=["Nenhum setup direcional atingiu o nível mínimo de qualidade."],
         )
         return [avoid]
 
@@ -79,11 +87,11 @@ class TradingOpportunitySignalEngine:
         if snapshot.volatility_pct > 6:
             direction = Direction.AVOID
             confidence = min(confidence, 0.35)
-            technical_reasons.append("ATR-based volatility is elevated for a short-term signal.")
+            technical_reasons.append("A volatilidade medida pelo ATR está elevada para um sinal de curto prazo.")
 
         if direction in {Direction.BUY, Direction.SELL} and confidence < 0.5:
             direction = Direction.WAIT
-            technical_reasons.append("Setup score is below the actionable threshold.")
+            technical_reasons.append("A pontuação do setup está abaixo do limite operacional.")
 
         risk = calculate_risk_assessment(
             direction=direction,
@@ -96,13 +104,14 @@ class TradingOpportunitySignalEngine:
 
         warnings = list(BASE_WARNINGS)
         if direction == Direction.AVOID:
-            warnings.append("Market conditions are unfavorable for a preliminary signal.")
+            warnings.append("As condições de mercado estão desfavoráveis para um sinal preliminar.")
         elif direction == Direction.WAIT:
-            warnings.append("Signal is watchlist-only until confirmation improves.")
+            warnings.append("O sinal deve permanecer apenas em observação até que haja uma confirmação melhor.")
 
         return OpportunitySignal(
             symbol=request.symbol,
             strategy_type=request.strategy_type,
+            strategy_id=request.strategy_id,
             timeframe=request.timeframe,
             direction=direction,
             confidence_score=round(confidence, 2),
@@ -110,6 +119,7 @@ class TradingOpportunitySignalEngine:
             entry_price=risk.entry_price,
             stop_loss=risk.stop_loss,
             take_profit=risk.take_profit,
+            execution_ready=direction in {Direction.BUY, Direction.SELL},
             risk_reward_ratio=risk.risk_reward_ratio,
             position_size=risk.position_size,
             max_loss=risk.max_loss,
@@ -123,10 +133,11 @@ class TradingOpportunitySignalEngine:
         return OpportunitySignal(
             symbol=request.symbol,
             strategy_type=request.strategy_type,
+            strategy_id=request.strategy_id,
             timeframe=request.timeframe,
             direction=Direction.WAIT,
             confidence_score=0.0,
             setup_name=setup_name,
             technical_reasons=reasons,
-            warnings=BASE_WARNINGS + ["No actionable signal was generated."],
+            warnings=BASE_WARNINGS + ["Nenhum sinal operacional foi gerado."],
         )

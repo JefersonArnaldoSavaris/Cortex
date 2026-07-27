@@ -18,6 +18,7 @@ from sqlalchemy.exc import IntegrityError
 
 from .db import session_scope
 from .models import AuthUser, ForgotPasswordRequest, LoginRequest, RegisterRequest, UserPlan, UserRole, UserStatus
+from .favorite_repository import add_default_favorites
 from .orm import UserORM
 
 AUTH_COOKIE_NAME = "cortex_session"
@@ -164,6 +165,7 @@ def register_user(payload: RegisterRequest) -> AuthUser:
         with session_scope() as session:
             session.add(user)
             session.flush()
+            add_default_favorites(session, user.id)
             session.refresh(user)
             return to_auth_user(user)
     except IntegrityError:
@@ -206,6 +208,10 @@ def get_current_user(
     token = cookie_token or _extract_bearer_token(authorization)
     if not token:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Autenticação necessária.")
+    return get_user_from_token(token)
+
+
+def get_user_from_token(token: str) -> AuthUser:
     payload = decode_access_token(token)
     user_id = str(payload.get("sub") or "")
     with session_scope() as session:
@@ -218,4 +224,3 @@ def get_current_user(
 
 
 CurrentUser = Depends(get_current_user)
-
