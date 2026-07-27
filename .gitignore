@@ -235,3 +235,4 @@ apps/web/.env.local
 
 # Generated reports
 reports/
+.vercel
