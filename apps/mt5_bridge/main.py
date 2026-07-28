@@ -147,3 +147,14 @@ def symbols(query: str = "", limit: int = Query(default=500, ge=1, le=5000)) -> 
     except Exception as exc:
         raise HTTPException(status_code=502, detail=str(exc)) from exc
     return SymbolsResponse(symbols=items)
+
+
+@app.get("/orders/history")
+def operation_history(
+    days: int = Query(default=90, ge=1, le=3650),
+    limit: int = Query(default=500, ge=1, le=2000),
+) -> dict:
+    try:
+        return {"operations": _active_provider().get_operation_history(days=days, limit=limit)}
+    except Exception as exc:
+        raise HTTPException(status_code=502, detail=str(exc)) from exc

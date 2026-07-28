@@ -104,6 +104,7 @@ class MT5SessionManager:
         if not hasattr(provider, "execute_order"):
             raise ValueError("A ponte MT5 atual ainda não oferece envio de ordens.")
         return provider.execute_order(**payload.model_dump(exclude={
+            "reference_price",
             "technical_reasons",
             "risk_reasons",
             "analysis_generated_at",
@@ -121,6 +122,12 @@ class MT5SessionManager:
             raise ValueError("A ponte MT5 atual ainda não oferece acompanhamento de posições.")
         return provider.get_open_order_statuses()
 
+    def get_operation_history(self, user: AuthUser, days: int = 90, limit: int = 500) -> list[dict]:
+        provider = self.get_provider(user)
+        if not hasattr(provider, "get_operation_history"):
+            raise ValueError("A ponte MT5 atual ainda não oferece histórico de operações.")
+        return provider.get_operation_history(days=days, limit=limit)
+
     def close_position(self, user: AuthUser, position_ticket: int) -> dict:
         provider = self.get_provider(user)
         if not hasattr(provider, "close_position"):
@@ -132,7 +139,7 @@ class MT5SessionManager:
         if not hasattr(provider, "preview_pending_order"):
             raise ValueError("A ponte MT5 atual ainda não oferece ordens pendentes.")
         return provider.preview_pending_order(**payload.model_dump(exclude={
-            "technical_reasons", "risk_reasons", "analysis_generated_at",
+            "reference_price", "technical_reasons", "risk_reasons", "analysis_generated_at",
         }))
 
     def execute_pending_order(self, user: AuthUser, payload) -> dict:
@@ -140,7 +147,7 @@ class MT5SessionManager:
         if not hasattr(provider, "execute_pending_order"):
             raise ValueError("A ponte MT5 atual ainda não oferece ordens pendentes.")
         return provider.execute_pending_order(**payload.model_dump(exclude={
-            "technical_reasons", "risk_reasons", "analysis_generated_at",
+            "reference_price", "technical_reasons", "risk_reasons", "analysis_generated_at",
         }))
 
     def list_pending_orders(self, user: AuthUser) -> list[dict]:

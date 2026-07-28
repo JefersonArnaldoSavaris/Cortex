@@ -3,8 +3,10 @@
 import {
   Activity,
   AlertTriangle,
+  BarChart3,
   Cable,
   Clock3,
+  List,
   Loader2,
   RadioTower,
   Search,
@@ -13,8 +15,9 @@ import {
   Sparkles,
   Star,
   Target,
+  X,
 } from "lucide-react";
-import { useEffect, useMemo, useState, type Dispatch, type FormEvent, type KeyboardEvent, type ReactNode, type SetStateAction } from "react";
+import { useEffect, useMemo, useRef, useState, type Dispatch, type FormEvent, type KeyboardEvent, type ReactNode, type SetStateAction } from "react";
 
 import type {
   OpportunityDirection,
@@ -83,6 +86,7 @@ const directionTone: Record<OpportunityDirection, string> = {
 };
 
 type OpportunityWorkspaceProps = {
+  demoMode: boolean;
   assets: Array<{ symbol: string; name: string; category: string }>;
   favorites: Array<{ symbol: string; name: string; category: string; default_provider_symbol: string }>;
   favoritesEnabled: boolean;
@@ -122,6 +126,7 @@ type OpportunityWorkspaceProps = {
 };
 
 export function OpportunityWorkspace({
+  demoMode,
   assets,
   favorites,
   favoritesEnabled,
@@ -192,12 +197,13 @@ export function OpportunityWorkspace({
           />
           </aside>
         </div>
-        {form.provider === "mt5" && (
+        {(form.provider === "mt5" || demoMode) && (
           (primarySignal && (["BUY", "SELL"].includes(primarySignal.direction) || Boolean(primarySignal.planned_direction))) ||
           orderStatuses.length > 0 ||
           pendingOrderStatuses.length > 0
         ) ? (
           <OrderExecutionPanel
+            demoMode={demoMode}
             signal={primarySignal && (["BUY", "SELL"].includes(primarySignal.direction) || primarySignal.planned_direction) ? primarySignal : null}
             preview={orderPreview}
             execution={orderExecution}
@@ -220,6 +226,7 @@ export function OpportunityWorkspace({
 }
 
 function OrderExecutionPanel({
+  demoMode,
   signal,
   preview,
   execution,
@@ -235,6 +242,7 @@ function OrderExecutionPanel({
   onReset,
   onViewOnChart,
 }: {
+  demoMode: boolean;
   signal: OpportunitySignal | null;
   preview: OrderPreview | null;
   execution: OrderExecution | null;
@@ -256,26 +264,50 @@ function OrderExecutionPanel({
   const [isCloseAllOpen, setIsCloseAllOpen] = useState(false);
   const [pendingCancelStatus, setPendingCancelStatus] = useState<PendingOrderStatus | null>(null);
   const [isPreparationOpen, setIsPreparationOpen] = useState(true);
+  const onPreviewRef = useRef(onPreview);
 
   useEffect(() => {
     if (execution) setIsPreparationOpen(false);
   }, [execution]);
 
+  useEffect(() => {
+    onPreviewRef.current = onPreview;
+  }, [onPreview]);
+
+  useEffect(() => {
+    setVolume(0.01);
+  }, [signal?.symbol, signal?.generated_at]);
+
+  useEffect(() => {
+    if (!signal || !isPreparationOpen || !Number.isFinite(volume) || volume < 0.01) return;
+    const timer = window.setTimeout(() => onPreviewRef.current(volume), 300);
+    return () => window.clearTimeout(timer);
+  }, [
+    isPreparationOpen,
+    signal?.direction,
+    signal?.entry_price,
+    signal?.planned_direction,
+    signal?.stop_loss,
+    signal?.symbol,
+    signal?.take_profit,
+    volume,
+  ]);
+
   const accountCurrency = statuses[0]?.currency ?? "";
   const accountTotal = statuses[0]?.account_equity;
   const openResult = statuses.reduce((total, status) => total + (status.profit ?? 0), 0);
-  const isPendingSignal = signal?.direction === "WAIT" && Boolean(signal.planned_direction);
   const displayedDirection = signal?.planned_direction ?? signal?.direction;
+  const calculatedPreview = preview && Math.abs(preview.requested_volume - volume) < 0.000001 ? preview : null;
 
   return (
     <section className="orderExecutionPanel">
       <div className="orderExecutionHeader">
         <div>
-          <span>Execução na corretora</span>
+          <span>{demoMode ? "Simulador de operações" : "Execução na corretora"}</span>
           <strong>{signal ? `${displayedDirection} ${signal.symbol}` : `${statuses.length} posição(ões) em execução`}</strong>
         </div>
-        <span className="orderExecutionWarning">Ordem real</span>
-        {execution ? <span className="orderExecutionSuccess">Ordem enviada</span> : null}
+        <span className="orderExecutionWarning">{demoMode ? "Conta demo" : "Ordem real"}</span>
+        {execution ? <span className="orderExecutionSuccess">{demoMode ? "Simulação aberta" : "Ordem enviada"}</span> : null}
         {signal ? (
           <button
             className="orderPreparationToggle"
@@ -297,39 +329,39 @@ function OrderExecutionPanel({
         </div>
       ) : null}
       {signal && isPreparationOpen ? <section className="orderCalculationStage">
-        <strong>1. Calcular tamanho e valores</strong>
+        <strong>Preparar ordem</strong>
         <div className="orderExecutionControls">
         <label>
           Volume em lotes
-          <input min="0.0001" onChange={(event) => setVolume(Number(event.target.value))} step="any" type="number" value={volume} />
+          <input min="0.01" onChange={(event) => setVolume(Number(event.target.value))} step="0.01" type="number" value={volume} />
         </label>
-        <button disabled={isLoading || volume <= 0} onClick={() => onPreview(volume)} type="button">
-          {isLoading ? "Validando..." : isPendingSignal ? "Calcular ordem pendente" : "Calcular e revisar"}
-        </button>
+        <span className="orderAutoCalculation">
+          {isLoading || !calculatedPreview ? "Atualizando cálculo..." : "Cálculo atualizado automaticamente"}
+        </span>
         </div>
       </section> : null}
-      {signal && isPreparationOpen && preview ? (
+      {signal && isPreparationOpen && calculatedPreview ? (
         <section className="orderSendStage">
-          <strong>2. Revisar e enviar para a corretora</strong>
+          <strong>{demoMode ? "Enviar para a conta demo" : "Enviar para a corretora"}</strong>
           <div className="orderPreviewGrid">
-            <RiskMetricCard label="Lote ajustado" value={preview.volume.toString()} />
-            <RiskMetricCard label="Entrada atual" value={preview.entry_price.toString()} />
-            <RiskMetricCard label="Perda no stop" value={`${preview.currency} ${preview.estimated_loss.toFixed(2)}`} tone="danger" />
-            <RiskMetricCard label="Ganho no alvo" value={`${preview.currency} ${preview.estimated_profit.toFixed(2)}`} tone="success" />
-            <RiskMetricCard label="Margem estimada" value={preview.estimated_margin == null ? "-" : `${preview.currency} ${preview.estimated_margin.toFixed(2)}`} />
+            <RiskMetricCard label="Lote" value={calculatedPreview.volume.toString()} />
+            <RiskMetricCard label="Entrada atual" value={calculatedPreview.entry_price.toString()} />
+            <RiskMetricCard label="Perda no stop" value={`${calculatedPreview.currency} ${calculatedPreview.estimated_loss.toFixed(2)}`} tone="danger" />
+            <RiskMetricCard label="Ganho no alvo" value={`${calculatedPreview.currency} ${calculatedPreview.estimated_profit.toFixed(2)}`} tone="success" />
+            <RiskMetricCard label="Margem estimada" value={calculatedPreview.estimated_margin == null ? "-" : `${calculatedPreview.currency} ${calculatedPreview.estimated_margin.toFixed(2)}`} />
           </div>
           <div className="orderConfirmation">
-            <span>Revise os valores antes de enviar. Esta ação cria uma ordem real.</span>
+            <span>{demoMode ? "Revise os valores. Esta ação cria somente uma posição simulada." : "Revise os valores antes de enviar. Esta ação cria uma ordem real."}</span>
             <button
               className="orderSendButton"
-              disabled={isLoading || !preview.execution_enabled}
-              onClick={() => onExecute(preview.volume)}
+              disabled={isLoading || !calculatedPreview.execution_enabled}
+              onClick={() => onExecute(calculatedPreview.volume)}
               type="button"
             >
-              <Send size={16} /> {preview.order_kind === "pending" ? "Apregoar ordem pendente" : "Enviar ordem real"}
+              <Send size={16} /> {demoMode ? "Abrir operação demo" : calculatedPreview.order_kind === "pending" ? "Apregoar ordem pendente" : "Enviar ordem real"}
             </button>
           </div>
-          {!preview.execution_enabled ? <p className="orderExecutionDisabled">Execução real desabilitada no servidor.</p> : null}
+          {!calculatedPreview.execution_enabled ? <p className="orderExecutionDisabled">{demoMode ? "Simulação indisponível." : "Execução real desabilitada no servidor."}</p> : null}
         </section>
       ) : null}
       {error ? <p className="orderExecutionError">{error}</p> : null}
@@ -348,11 +380,15 @@ function OrderExecutionPanel({
             <strong>{status.currency} {(status.profit ?? 0).toFixed(2)}</strong>
           </div>
           <div className="orderPositionActions">
-          <button className="orderChartButton" onClick={() => onViewOnChart(status)} type="button">
-            Ver no gráfico
-          </button>
-          <button className="orderReasonButton" onClick={() => setReasonStatus(status)} type="button">Razões técnicas</button>
-          <button className="orderCloseButton" disabled={isLoading || !status.position_ticket} onClick={() => setCloseStatus(status)} type="button">Fechar posição</button>
+            <button aria-label="Ver no gráfico" className="orderChartButton" onClick={() => onViewOnChart(status)} title="Ver no gráfico" type="button">
+              <BarChart3 aria-hidden="true" size={16} />
+            </button>
+            <button aria-label="Ver razões técnicas" className="orderReasonButton" onClick={() => setReasonStatus(status)} title="Razões técnicas" type="button">
+              <List aria-hidden="true" size={16} />
+            </button>
+            <button aria-label="Fechar posição" className="orderCloseButton" disabled={isLoading || !status.position_ticket} onClick={() => setCloseStatus(status)} title="Fechar posição" type="button">
+              <X aria-hidden="true" size={17} />
+            </button>
           </div>
         </div>
       ))}

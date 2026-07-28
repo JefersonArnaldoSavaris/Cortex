@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from contextlib import contextmanager
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 import platform
 import math
 import os
@@ -301,6 +301,94 @@ class MT5MarketDataProvider(MarketDataProvider):
                 key=lambda item: item["opened_at"] or datetime.min.replace(tzinfo=timezone.utc),
                 reverse=True,
             )
+
+    def get_operation_history(self, days: int = 90, limit: int = 500) -> list[dict]:
+        with self._connected() as mt5:
+            now = datetime.now(timezone.utc)
+            start = now - timedelta(days=max(1, days))
+            account = mt5.account_info()
+            currency = str(account.currency if account else "")
+            positions = mt5.positions_get() or ()
+            open_tickets = {
+                int(position._asdict().get("ticket") or 0)
+                for position in positions
+            }
+            operations: list[dict] = []
+
+            for position in positions:
+                data = position._asdict()
+                position_type = int(data.get("type") or 0)
+                operations.append({
+                    "position_ticket": int(data.get("ticket") or 0),
+                    "symbol": str(data.get("symbol") or ""),
+                    "direction": "BUY" if position_type == mt5.POSITION_TYPE_BUY else "SELL",
+                    "volume": float(data.get("volume") or 0),
+                    "entry_price": float(data.get("price_open") or 0),
+                    "exit_price": float(data.get("price_current") or 0) or None,
+                    "stop_loss": float(data.get("sl") or 0) or None,
+                    "take_profit": float(data.get("tp") or 0) or None,
+                    "profit": float(data.get("profit") or 0),
+                    "swap": float(data.get("swap") or 0),
+                    "commission": 0.0,
+                    "currency": currency,
+                    "status": "open",
+                    "opened_at": datetime.fromtimestamp(int(data.get("time") or 0), tz=timezone.utc),
+                    "closed_at": None,
+                })
+
+            deals = mt5.history_deals_get(start, now) or ()
+            grouped: dict[int, list[dict]] = {}
+            for deal in deals:
+                data = deal._asdict()
+                position_ticket = int(data.get("position_id") or 0)
+                deal_type = int(data.get("type") or -1)
+                if not position_ticket or deal_type not in {mt5.DEAL_TYPE_BUY, mt5.DEAL_TYPE_SELL}:
+                    continue
+                grouped.setdefault(position_ticket, []).append(data)
+
+            orders = mt5.history_orders_get(start, now) or ()
+            order_by_position: dict[int, dict] = {}
+            for order in orders:
+                data = order._asdict()
+                position_ticket = int(data.get("position_id") or 0)
+                if position_ticket and position_ticket not in order_by_position:
+                    order_by_position[position_ticket] = data
+
+            for position_ticket, position_deals in grouped.items():
+                if position_ticket in open_tickets:
+                    continue
+                ordered = sorted(
+                    position_deals,
+                    key=lambda item: int(item.get("time_msc") or item.get("time") or 0),
+                )
+                first, last = ordered[0], ordered[-1]
+                order = order_by_position.get(position_ticket, {})
+                operations.append({
+                    "position_ticket": position_ticket,
+                    "symbol": str(first.get("symbol") or last.get("symbol") or ""),
+                    "direction": "BUY" if int(first.get("type") or 0) == mt5.DEAL_TYPE_BUY else "SELL",
+                    "volume": float(first.get("volume") or 0),
+                    "entry_price": float(first.get("price") or 0),
+                    "exit_price": float(last.get("price") or 0) if len(ordered) > 1 else None,
+                    "stop_loss": float(order.get("sl") or 0) or None,
+                    "take_profit": float(order.get("tp") or 0) or None,
+                    "profit": sum(float(item.get("profit") or 0) for item in ordered),
+                    "swap": sum(float(item.get("swap") or 0) for item in ordered),
+                    "commission": sum(
+                        float(item.get("commission") or 0) + float(item.get("fee") or 0)
+                        for item in ordered
+                    ),
+                    "currency": currency,
+                    "status": "closed",
+                    "opened_at": datetime.fromtimestamp(int(first.get("time") or 0), tz=timezone.utc),
+                    "closed_at": datetime.fromtimestamp(int(last.get("time") or 0), tz=timezone.utc),
+                })
+
+            return sorted(
+                operations,
+                key=lambda item: item["closed_at"] or item["opened_at"],
+                reverse=True,
+            )[:limit]
 
     def close_position(self, position_ticket: int) -> dict:
         if os.getenv("CORTEX_LIVE_TRADING_ENABLED", "false").lower() != "true":

@@ -57,6 +57,10 @@ class MT5BridgeMarketDataProvider(MarketDataProvider):
     def get_market_tick(self, symbol: str) -> dict:
         return self._request("GET", "/tick", params={"symbol": symbol})
 
+    def get_operation_history(self, days: int = 90, limit: int = 500) -> list[dict]:
+        body = self._request("GET", "/orders/history", params={"days": days, "limit": limit})
+        return list(body.get("operations", []))
+
     def _request(self, method: str, path: str, **kwargs) -> dict:
         try:
             response = requests.request(method, f"{self.base_url}{path}", timeout=self.timeout, **kwargs)

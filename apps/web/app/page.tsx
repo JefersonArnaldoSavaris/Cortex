@@ -26,6 +26,7 @@ import {
   type ViewKey,
 } from "./components/platform";
 import { AuthScreen, type AuthMode } from "./components/auth";
+import { OperationHistory, type OperationHistoryItem } from "./components/OperationHistory";
 import { AssetCombobox, OpportunityWorkspace } from "./opportunities/OpportunityWorkspace";
 import type { OpportunityRequest, OpportunityResult, OpportunitySignal, OpportunityTimeframe, OrderExecution, OrderPreview, OrderStatus, PendingOrderStatus } from "./opportunities/types";
 
@@ -603,6 +604,9 @@ export default function Dashboard() {
   const [orderExecution, setOrderExecution] = useState<OrderExecution | null>(null);
   const [openOrderStatuses, setOpenOrderStatuses] = useState<OrderStatus[]>([]);
   const [pendingOrderStatuses, setPendingOrderStatuses] = useState<PendingOrderStatus[]>([]);
+  const [operationHistory, setOperationHistory] = useState<OperationHistoryItem[]>([]);
+  const [operationHistoryError, setOperationHistoryError] = useState<string | null>(null);
+  const [isOperationHistoryLoading, setIsOperationHistoryLoading] = useState(false);
   const [chartedOrderTicket, setChartedOrderTicket] = useState<number | null>(null);
   const initializedOpenOrderChartRef = useRef(false);
   const initializedMacroFavoriteSourceRef = useRef<string | null>(null);
@@ -1166,7 +1170,7 @@ export default function Dashboard() {
 
   async function previewOrder(volume: number) {
     const signal = opportunityResult?.signals[0];
-    const direction = ["BUY", "SELL"].includes(signal?.direction ?? "") ? signal?.direction : signal?.planned_direction;
+    const direction = signal?.direction === "BUY" || signal?.direction === "SELL" ? signal.direction : signal?.planned_direction;
     const isPending = signal?.direction === "WAIT" && signal.strategy_id === "smc";
     if (!signal || !signal.stop_loss || !signal.take_profit || !signal.entry_price || !direction) return;
     setIsOrderLoading(true);
@@ -1197,7 +1201,7 @@ export default function Dashboard() {
 
   async function executeOrder(volume: number) {
     const signal = opportunityResult?.signals[0];
-    const direction = ["BUY", "SELL"].includes(signal?.direction ?? "") ? signal?.direction : signal?.planned_direction;
+    const direction = signal?.direction === "BUY" || signal?.direction === "SELL" ? signal.direction : signal?.planned_direction;
     const isPending = orderPreview?.order_kind === "pending";
     if (!signal || !signal.stop_loss || !signal.take_profit || !signal.entry_price || !direction) return;
     setIsOrderLoading(true);
@@ -1212,6 +1216,7 @@ export default function Dashboard() {
           direction,
           volume,
           ...(isPending ? { entry_price: signal.entry_price } : {}),
+          reference_price: orderPreview?.entry_price,
           stop_loss: signal.stop_loss,
           take_profit: signal.take_profit,
           technical_reasons: signal.technical_reasons,
@@ -1222,7 +1227,34 @@ export default function Dashboard() {
       if (!response.ok) throw new Error(await readApiError(response, "A corretora rejeitou a ordem."));
       const execution = (await response.json()) as OrderExecution;
       setOrderExecution(execution);
-      if (execution.position_ticket) setChartedOrderTicket(execution.position_ticket);
+      if (execution.position_ticket) {
+        const entryPrice = execution.executed_price ?? orderPreview?.entry_price ?? signal.entry_price;
+        const optimisticStatus: OrderStatus = {
+          status: "open",
+          symbol: signal.symbol,
+          position_ticket: execution.position_ticket,
+          direction,
+          volume: execution.volume,
+          entry_price: entryPrice,
+          current_price: entryPrice,
+          stop_loss: signal.stop_loss,
+          take_profit: signal.take_profit,
+          profit: 0,
+          swap: 0,
+          currency: orderPreview?.currency ?? mt5Status.currency ?? "USD",
+          account_balance: mt5Status.connected ? mt5Status.balance : 10_000,
+          account_equity: mt5Status.connected ? mt5Status.equity : 10_000,
+          opened_at: new Date().toISOString(),
+          technical_reasons: signal.technical_reasons,
+          risk_reasons: signal.risk_reasons,
+          analysis_generated_at: signal.generated_at,
+        };
+        setOpenOrderStatuses((current) => [
+          optimisticStatus,
+          ...current.filter((status) => status.position_ticket !== execution.position_ticket),
+        ]);
+        setChartedOrderTicket(execution.position_ticket);
+      }
     } catch (err) {
       setOrderError(err instanceof Error ? err.message : "Erro ao enviar a ordem.");
     } finally {
@@ -1300,8 +1332,32 @@ export default function Dashboard() {
     setOrderError(null);
   }
 
+  async function loadOperationHistory() {
+    setIsOperationHistoryLoading(true);
+    setOperationHistoryError(null);
+    try {
+      const response = await fetch(`${API_URL}/orders/history?days=365&limit=1000`, {
+        credentials: "include",
+      });
+      if (!response.ok) {
+        throw new Error(await readApiError(response, "Não foi possível carregar o histórico de operações."));
+      }
+      const data = (await response.json()) as { operations: OperationHistoryItem[] };
+      setOperationHistory(data.operations);
+    } catch (err) {
+      setOperationHistoryError(err instanceof Error ? err.message : "Erro ao consultar o histórico da corretora.");
+    } finally {
+      setIsOperationHistoryLoading(false);
+    }
+  }
+
   useEffect(() => {
-    if (marketDataProvider !== "mt5" || !mt5Status.connected) {
+    if (activeView !== "historico-operacoes") return;
+    void loadOperationHistory();
+  }, [activeView, mt5Status.connected]);
+
+  useEffect(() => {
+    if (!user) {
       setOpenOrderStatuses([]);
       setPendingOrderStatuses([]);
       setChartedOrderTicket(null);
@@ -1333,12 +1389,12 @@ export default function Dashboard() {
       }
     };
     void loadStatus();
-    const timer = window.setInterval(loadStatus, 1000);
+    const timer = window.setInterval(loadStatus, mt5Status.connected ? 1000 : 5000);
     return () => {
       cancelled = true;
       window.clearInterval(timer);
     };
-  }, [marketDataProvider, mt5Status.connected, orderExecution?.order_ticket, orderExecution?.position_ticket]);
+  }, [mt5Status.connected, orderExecution?.order_ticket, orderExecution?.position_ticket, user]);
 
   async function connectMt5(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -1575,13 +1631,10 @@ export default function Dashboard() {
   return (
     <AppShell
       activeView={activeView}
-      apiStatus={error ? "degraded" : "online"}
       controlPanel={null}
-      marketStatus="Mercado aberto simulado"
       onHome={returnHome}
       onNavigate={setActiveView}
       onLogout={logout}
-      onRefresh={() => loadAnalyses()}
       user={user}
     >
       {error ? <ErrorState message={error} /> : null}
@@ -1589,6 +1642,7 @@ export default function Dashboard() {
       {activeView === "oportunidades-micro" ? (
         <OpportunityWorkspace
           assets={opportunityAssets}
+          demoMode={!mt5Status.connected}
           chartSlot={marketPanel}
           error={opportunityError}
           form={opportunityForm}
@@ -1738,6 +1792,15 @@ export default function Dashboard() {
               </section>
             )}
           </section>
+      ) : activeView === "historico-operacoes" ? (
+        <OperationHistory
+          currency={mt5Status.currency}
+          demoMode={!mt5Status.connected}
+          error={operationHistoryError}
+          isLoading={isOperationHistoryLoading}
+          onRefresh={loadOperationHistory}
+          operations={operationHistory}
+        />
       ) : (
         <section className="detailPanel detailPanelFull">
           <div className="sectionTitle">
