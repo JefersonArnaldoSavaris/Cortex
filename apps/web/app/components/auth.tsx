@@ -3,10 +3,8 @@
 import { useState } from "react";
 import type { ReactNode } from "react";
 import {
-  Apple,
   BrainCircuit,
   ChevronRight,
-  Chrome,
   Eye,
   EyeOff,
   Gauge,
@@ -72,10 +70,6 @@ function AuthShell({ children, onEnter }: { children: ReactNode; onEnter: () => 
           <div><strong>Cortex</strong><span>AI Trading Intelligence</span></div>
         </div>
         <nav aria-label="Navegação pública">
-          <a href="#recursos">Recursos</a>
-          <a href="#acesso">Planos</a>
-          <a href="#seguranca">Segurança</a>
-          <a href="#acesso">Suporte</a>
           <button onClick={onEnter} type="button">Entrar</button>
         </nav>
       </header>
@@ -312,12 +306,6 @@ function AuthCard({
 
       {mode === "login" ? (
         <form className="authForm authForm--premium" onSubmit={submitLogin}>
-          <AuthTitle icon={Radar} title="Bem-vindo de volta" subtitle="Acesse sua conta e continue sua jornada com o Cortex." />
-          <div className="socialLoginGrid">
-            <SocialLoginButton icon={Chrome} label="Entrar com Google" />
-            <SocialLoginButton icon={Apple} label="Entrar com Apple" />
-          </div>
-          <div className="authDivider"><span>ou</span></div>
           <FieldShell icon={Mail} label="E-mail ou usuário">
             <input autoComplete="email" placeholder="seu@email.com" type="email" value={loginEmail} onChange={(event) => setLoginEmail(event.target.value)} />
           </FieldShell>
@@ -393,15 +381,6 @@ function AuthTitle({ icon: Icon, subtitle, title }: { icon: LucideIcon; subtitle
         <p>{subtitle}</p>
       </div>
     </div>
-  );
-}
-
-function SocialLoginButton({ icon: Icon, label }: { icon: LucideIcon; label: string }) {
-  return (
-    <button className="socialLoginButton" disabled title="Em breve" type="button">
-      <Icon size={18} />
-      <span>{label}</span>
-    </button>
   );
 }
 
