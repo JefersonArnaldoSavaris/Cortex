@@ -79,6 +79,11 @@ def _cors_origins() -> list[str]:
     return origins or ["http://localhost:3000", "http://127.0.0.1:3000"]
 
 
+def _cors_origin_regex() -> str:
+    configured = os.getenv("CORTEX_CORS_ORIGIN_REGEX", "").strip()
+    return configured or r"^https://cortex-(?:[a-z0-9]+-)?cortex-4dd4\.vercel\.app$"
+
+
 def _has_mt5(user: AuthUser) -> bool:
     try:
         return mt5_sessions.status(user).connected
@@ -115,6 +120,7 @@ def startup() -> None:
 app.add_middleware(
     CORSMiddleware,
     allow_origins=_cors_origins(),
+    allow_origin_regex=_cors_origin_regex(),
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
