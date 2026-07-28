@@ -1,13 +1,12 @@
 "use client";
 
 import {
-  Activity,
   AlertCircle,
-  Bell,
   Bot,
   ChevronRight,
   CircleUserRound,
   Crosshair,
+  History,
   LucideIcon,
   Network,
   Radar,
@@ -20,6 +19,7 @@ import { useState, type ReactNode } from "react";
 export type ViewKey =
   | "oportunidades-micro"
   | "oportunidades-macro"
+  | "historico-operacoes"
   | "integracoes";
 
 export type SessionUser = {
@@ -51,6 +51,7 @@ type NavGroup = {
 type NavigationEntry = NavItem | NavGroup;
 
 const navigation: NavItem[] = [
+  { key: "historico-operacoes", label: "Histórico de operações", icon: History },
   { key: "integracoes", label: "Integrações", icon: Network },
 ];
 
@@ -71,26 +72,20 @@ const navigationEntries: NavigationEntry[] = [
 
 type AppShellProps = {
   activeView: ViewKey;
-  apiStatus: "online" | "degraded";
   children: ReactNode;
   controlPanel: ReactNode;
-  marketStatus: string;
   onHome: () => void;
   onNavigate: (view: ViewKey) => void;
-  onRefresh: () => void;
   onLogout: () => void;
   user: SessionUser;
 };
 
 export function AppShell({
   activeView,
-  apiStatus,
   children,
   controlPanel,
-  marketStatus,
   onHome,
   onNavigate,
-  onRefresh,
   onLogout,
   user,
 }: AppShellProps) {
@@ -98,13 +93,7 @@ export function AppShell({
     <main className="terminalShell">
       <Sidebar activeView={activeView} controlPanel={controlPanel} onHome={onHome} onNavigate={onNavigate} />
       <section className="terminalMain">
-        <Topbar
-          apiStatus={apiStatus}
-          marketStatus={marketStatus}
-          onLogout={onLogout}
-          onRefresh={onRefresh}
-          user={user}
-        />
+        <Topbar onLogout={onLogout} user={user} />
         {children}
       </section>
     </main>
@@ -203,35 +192,16 @@ export function Sidebar({
 }
 
 export function Topbar({
-  apiStatus,
-  marketStatus,
-  onRefresh,
   onLogout,
   user,
 }: {
-  apiStatus: "online" | "degraded";
-  marketStatus: string;
   onLogout: () => void;
-  onRefresh: () => void;
   user: SessionUser;
 }) {
   const firstName = user.name.split(" ")[0] || "Trader";
   return (
     <header className="terminalTopbar">
       <div className="topbarCluster">
-        <span className="marketStatus">
-          <span />
-          {marketStatus}
-        </span>
-        <span className={apiStatus === "online" ? "apiStatus apiStatus--online" : "apiStatus apiStatus--degraded"}>
-          API {apiStatus === "online" ? "online" : "atenção"}
-        </span>
-        <button className="topbarIconButton" onClick={onRefresh} type="button" aria-label="Atualizar dados">
-          <Activity size={17} />
-        </button>
-        <button className="topbarIconButton" type="button" aria-label="Notificações">
-          <Bell size={17} />
-        </button>
         <div className="userChip" title={`${user.name} · ${user.plan}`}>
           <CircleUserRound size={18} />
           <span>{firstName}</span>

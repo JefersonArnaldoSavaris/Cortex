@@ -69,6 +69,24 @@ class ExecutedOpportunityORM(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, default=datetime.now)
 
 
+class PaperPositionORM(Base):
+    __tablename__ = "posicoes_demo"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    user_id: Mapped[str] = mapped_column(Text, ForeignKey("usuarios.id", ondelete="CASCADE"), nullable=False, index=True)
+    symbol: Mapped[str] = mapped_column(Text, nullable=False)
+    direction: Mapped[str] = mapped_column(Text, nullable=False)
+    volume: Mapped[float] = mapped_column(Float, nullable=False)
+    entry_price: Mapped[float] = mapped_column(Float, nullable=False)
+    exit_price: Mapped[float | None] = mapped_column(Float, nullable=True)
+    stop_loss: Mapped[float | None] = mapped_column(Float, nullable=True)
+    take_profit: Mapped[float | None] = mapped_column(Float, nullable=True)
+    profit: Mapped[float] = mapped_column(Float, nullable=False, default=0)
+    status: Mapped[str] = mapped_column(Text, nullable=False, default="open", index=True)
+    opened_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, default=datetime.now)
+    closed_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+
+
 class BrokerConnectionORM(Base):
     __tablename__ = "conexoes_corretora"
 

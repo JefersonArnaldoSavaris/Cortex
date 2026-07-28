@@ -154,6 +154,7 @@ class OrderPreviewResponse(BaseModel):
 
 
 class OrderExecuteRequest(OrderPreviewRequest):
+    reference_price: float | None = Field(default=None, gt=0)
     technical_reasons: list[str] = Field(default_factory=list, max_length=20)
     risk_reasons: list[str] = Field(default_factory=list, max_length=20)
     analysis_generated_at: str | None = None
@@ -214,6 +215,28 @@ class OrderStatusResponse(BaseModel):
     technical_reasons: list[str] = Field(default_factory=list)
     risk_reasons: list[str] = Field(default_factory=list)
     analysis_generated_at: str | None = None
+
+
+class OperationHistoryItem(BaseModel):
+    position_ticket: int
+    symbol: str
+    direction: Literal["BUY", "SELL"]
+    volume: float
+    entry_price: float
+    exit_price: float | None = None
+    stop_loss: float | None = None
+    take_profit: float | None = None
+    profit: float
+    swap: float = 0
+    commission: float = 0
+    currency: str
+    status: Literal["open", "closed"]
+    opened_at: datetime
+    closed_at: datetime | None = None
+
+
+class OperationHistoryResponse(BaseModel):
+    operations: list[OperationHistoryItem]
 
 
 class AnalysisRequest(BaseModel):

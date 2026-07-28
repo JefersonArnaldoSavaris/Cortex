@@ -60,11 +60,14 @@ from .models import (
     PendingOrderStatusResponse,
     OrderExecutionResponse,
     OrderStatusResponse,
+    OperationHistoryItem,
+    OperationHistoryResponse,
     OrderPreviewRequest,
     OrderPreviewResponse,
     RegisterRequest,
 )
 from .service import analysis_service, get_asset_history, get_assets, get_free_market_tick, search_assets
+from . import paper_repository
 
 
 opportunity_agent = TradingOpportunityAgent()
@@ -74,6 +77,28 @@ def _cors_origins() -> list[str]:
     configured = os.getenv("CORTEX_CORS_ORIGINS", "")
     origins = [origin.strip().rstrip("/") for origin in configured.split(",") if origin.strip()]
     return origins or ["http://localhost:3000", "http://127.0.0.1:3000"]
+
+
+def _has_mt5(user: AuthUser) -> bool:
+    try:
+        return mt5_sessions.status(user).connected
+    except (ConnectionError, RuntimeError, ValueError):
+        return False
+
+
+def _paper_price(symbol: str) -> float:
+    tick = get_free_market_tick(symbol)
+    return float(tick.get("last") or tick.get("bid") or tick.get("ask") or 0)
+
+
+def _paper_prices(symbols: set[str]) -> dict[str, float]:
+    prices: dict[str, float] = {}
+    for symbol in symbols:
+        try:
+            prices[symbol] = _paper_price(symbol)
+        except (RuntimeError, ValueError):
+            continue
+    return prices
 
 
 app = FastAPI(
@@ -334,6 +359,13 @@ def order_preview(
     current_user: AuthUser = Depends(get_current_user),
 ) -> OrderPreviewResponse:
     try:
+        if not _has_mt5(current_user):
+            return OrderPreviewResponse.model_validate(
+                paper_repository.preview_order(
+                    **payload.model_dump(),
+                    price=_paper_price(payload.symbol),
+                )
+            )
         return OrderPreviewResponse.model_validate(mt5_sessions.preview_order(current_user, payload))
     except (ConnectionError, PermissionError, RuntimeError, ValueError) as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
@@ -345,6 +377,8 @@ def pending_order_preview(
     current_user: AuthUser = Depends(get_current_user),
 ) -> OrderPreviewResponse:
     try:
+        if not _has_mt5(current_user):
+            raise ValueError("Ordens pendentes ainda não estão disponíveis na conta demo.")
         return OrderPreviewResponse.model_validate(mt5_sessions.preview_pending_order(current_user, payload))
     except (ConnectionError, PermissionError, RuntimeError, ValueError) as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
@@ -377,6 +411,8 @@ def pending_order_execute(
 @app.get("/orders/pending", response_model=list[PendingOrderStatusResponse])
 def pending_orders(current_user: AuthUser = Depends(get_current_user)) -> list[PendingOrderStatusResponse]:
     try:
+        if not _has_mt5(current_user):
+            return []
         return [
             PendingOrderStatusResponse.model_validate(item)
             for item in mt5_sessions.list_pending_orders(current_user)
@@ -406,7 +442,18 @@ def order_execute(
     current_user: AuthUser = Depends(get_current_user),
 ) -> OrderExecutionResponse:
     try:
-        result = OrderExecutionResponse.model_validate(mt5_sessions.execute_order(current_user, payload))
+        if _has_mt5(current_user):
+            result = OrderExecutionResponse.model_validate(mt5_sessions.execute_order(current_user, payload))
+        else:
+            result = OrderExecutionResponse.model_validate(
+                paper_repository.execute_order(
+                    current_user.id,
+                    **payload.model_dump(exclude={
+                        "reference_price", "technical_reasons", "risk_reasons", "analysis_generated_at",
+                    }),
+                    price=payload.reference_price or _paper_price(payload.symbol),
+                )
+            )
         if result.position_ticket is not None:
             save_execution_context(
                 user_id=current_user.id,
@@ -430,6 +477,17 @@ def order_close(
     current_user: AuthUser = Depends(get_current_user),
 ) -> OrderExecutionResponse:
     try:
+        if not _has_mt5(current_user):
+            position = paper_repository.get_position(current_user.id, payload.position_ticket)
+            if position is None:
+                raise ValueError("Posição demo não encontrada.")
+            return OrderExecutionResponse.model_validate(
+                paper_repository.close_position(
+                    current_user.id,
+                    payload.position_ticket,
+                    _paper_price(position.symbol),
+                )
+            )
         return OrderExecutionResponse.model_validate(
             mt5_sessions.close_position(current_user, payload.position_ticket)
         )
@@ -446,6 +504,15 @@ def order_status(
     current_user: AuthUser = Depends(get_current_user),
 ) -> OrderStatusResponse:
     try:
+        if not _has_mt5(current_user) and position_ticket is not None:
+            statuses = paper_repository.list_open(
+                current_user.id,
+                {symbol.upper(): _paper_price(symbol)},
+            )
+            item = next((entry for entry in statuses if entry["position_ticket"] == position_ticket), None)
+            if item:
+                return OrderStatusResponse.model_validate(item)
+            return OrderStatusResponse(status="not_found", symbol=symbol, position_ticket=position_ticket, currency="USD")
         return OrderStatusResponse.model_validate(
             mt5_sessions.get_order_status(current_user, symbol, position_ticket)
         )
@@ -458,7 +525,12 @@ def open_orders(
     current_user: AuthUser = Depends(get_current_user),
 ) -> list[OrderStatusResponse]:
     try:
-        statuses = mt5_sessions.get_open_order_statuses(current_user)
+        if _has_mt5(current_user):
+            statuses = mt5_sessions.get_open_order_statuses(current_user)
+        else:
+            base = paper_repository.list_open(current_user.id, {})
+            prices = _paper_prices({str(item["symbol"]) for item in base})
+            statuses = paper_repository.list_open(current_user.id, prices)
         tickets = [int(item["position_ticket"]) for item in statuses if item.get("position_ticket")]
         contexts = execution_contexts_by_ticket(current_user.id, tickets)
         return [
@@ -468,6 +540,28 @@ def open_orders(
             })
             for item in statuses
         ]
+    except (ConnectionError, RuntimeError, ValueError) as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+
+@app.get("/orders/history", response_model=OperationHistoryResponse)
+def operation_history(
+    days: int = Query(default=90, ge=1, le=3650),
+    limit: int = Query(default=500, ge=1, le=2000),
+    current_user: AuthUser = Depends(get_current_user),
+) -> OperationHistoryResponse:
+    try:
+        if _has_mt5(current_user):
+            items = mt5_sessions.get_operation_history(current_user, days=days, limit=limit)
+        else:
+            base = paper_repository.history(current_user.id, days, limit, {})
+            prices = _paper_prices({
+                str(item["symbol"]) for item in base if item.get("status") == "open"
+            })
+            items = paper_repository.history(current_user.id, days, limit, prices)
+        return OperationHistoryResponse(
+            operations=[OperationHistoryItem.model_validate(item) for item in items]
+        )
     except (ConnectionError, RuntimeError, ValueError) as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
 
