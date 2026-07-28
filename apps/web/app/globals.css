@@ -1364,14 +1364,13 @@ label,
   grid-template-columns: repeat(4, minmax(0, 1fr));
 }
 
-.authBenefitCard {
-  align-content: start;
+.authBenefitGrid .authBenefitCard {
   background: rgba(15, 23, 42, 0.62);
   border-color: rgba(148, 163, 184, 0.2);
-  display: grid;
-  grid-template-columns: 1fr;
+  display: flex;
+  flex-direction: column;
   min-height: 225px;
-  padding: 18px 20px;
+  padding: 18px 20px 14px;
 }
 
 .authBenefitCard strong,
@@ -1390,14 +1389,14 @@ label,
 }
 
 .authBenefitArrow {
-  align-self: end;
+  align-self: flex-end !important;
   border: 1px solid currentColor;
   border-radius: 999px;
   color: #a855f7;
   height: 36px !important;
-  justify-self: end;
   margin-top: auto;
   padding: 8px !important;
+  position: static;
   width: 36px !important;
 }
 
