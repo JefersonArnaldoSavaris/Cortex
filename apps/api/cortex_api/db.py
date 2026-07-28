@@ -8,6 +8,7 @@ from pathlib import Path
 from dotenv import load_dotenv
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session, sessionmaker
+from sqlalchemy.pool import NullPool
 
 load_dotenv()
 
@@ -48,8 +49,6 @@ else:
     ENGINE_KWARGS.update(
         {
             "pool_pre_ping": True,
-            "pool_size": int(os.getenv("CORTEX_DB_POOL_SIZE", "5")),
-            "max_overflow": int(os.getenv("CORTEX_DB_MAX_OVERFLOW", "5")),
             "pool_recycle": int(os.getenv("CORTEX_DB_POOL_RECYCLE_SECONDS", "300")),
             "connect_args": {
                 "prepare_threshold": None,
@@ -57,6 +56,15 @@ else:
             },
         }
     )
+    if os.getenv("VERCEL") == "1":
+        ENGINE_KWARGS["poolclass"] = NullPool
+    else:
+        ENGINE_KWARGS.update(
+            {
+                "pool_size": int(os.getenv("CORTEX_DB_POOL_SIZE", "5")),
+                "max_overflow": int(os.getenv("CORTEX_DB_MAX_OVERFLOW", "5")),
+            }
+        )
 
 engine = create_engine(DATABASE_URL, **ENGINE_KWARGS)
 SessionLocal = sessionmaker(bind=engine, autoflush=False, autocommit=False, expire_on_commit=False, class_=Session)
