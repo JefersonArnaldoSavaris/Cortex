@@ -58,3 +58,6 @@ markers = [
 filterwarnings = [
     "ignore::DeprecationWarning",
 ]
+
+[tool.vercel]
+entrypoint = "apps.api.cortex_api.main:app"
